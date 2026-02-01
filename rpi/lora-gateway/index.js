@@ -125,6 +125,16 @@ async function handleLoRaMessage(data) {
       return;
     }
 
+    if (message.startsWith('BEACON;')) {
+      await handleBeacon(message);
+      return;
+    }
+
+    if (message.includes('Offline:')) {
+      handleOffline(message);
+      return;
+    }
+
     if (message.startsWith('ACK;')) {
       await handleAck(message);
       return;
@@ -275,6 +285,38 @@ function handleNodeStatus(message) {
 
 function handleMetrics(message) {
   console.log(`[METRICS] ${message}`);
+}
+
+async function handleBeacon(message) {
+  const parts = message.split(';');
+  const nodeId = parts[1] || '';
+  if (!nodeId) return;
+
+  connectedNodes.set(nodeId, {
+    nodeId,
+    lastSeen: new Date(),
+    status: 'online'
+  });
+
+  try {
+    await axios.post(`${BACKEND_URL}/api/nodes/register`, { nodeId });
+    console.log(`[BEACON] Registered node ${nodeId}`);
+  } catch (error) {
+    console.error(`[BEACON] Register failed for ${nodeId}:`, error.message);
+  }
+}
+
+function handleOffline(message) {
+  const match = message.match(/Offline:\s*(\S+)/);
+  const nodeId = match?.[1];
+  if (!nodeId) return;
+
+  const existing = connectedNodes.get(nodeId) || { nodeId };
+  connectedNodes.set(nodeId, {
+    ...existing,
+    status: 'offline',
+    lastSeen: new Date()
+  });
 }
 
 // ============ SENDING TO LORA ============
