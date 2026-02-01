@@ -48,6 +48,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // ============ DATABASE CONNECTION ============
+const fs = require('fs');
 const mysql = require('mysql2/promise');
 
 let dbPool;
@@ -55,6 +56,87 @@ let dbPool;
 // Test hook (used by automated tests)
 function setDbPoolForTests(pool) {
   dbPool = pool;
+}
+
+async function ensureDatabaseSchema() {
+  if (!dbPool) return;
+
+  const [tables] = await dbPool.query(
+    "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'"
+  );
+
+  if (tables.length === 0) {
+    console.log('⚠ Users table missing - creating schema');
+
+    const sqlPath = path.join(__dirname, '..', '..', 'docker', 'mysql.sql');
+    let statements = [];
+
+    if (fs.existsSync(sqlPath)) {
+      const rawSql = fs.readFileSync(sqlPath, 'utf8');
+      const cleaned = rawSql
+        .split('\n')
+        .filter(line => !line.trim().startsWith('--'))
+        .join('\n');
+
+      statements = cleaned
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0);
+    } else {
+      statements = [
+        `CREATE TABLE IF NOT EXISTS \`groups\` (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          groupId VARCHAR(64) UNIQUE NOT NULL,
+          name VARCHAR(128) NOT NULL,
+          description TEXT,
+          permissions JSON,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          userId VARCHAR(64) UNIQUE NOT NULL,
+          username VARCHAR(64) UNIQUE NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          passwordHash VARCHAR(255) NOT NULL,
+          passwordSha256 VARCHAR(64) NOT NULL DEFAULT '',
+          groupId INT NOT NULL,
+          isActive BOOLEAN DEFAULT TRUE,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (groupId) REFERENCES \`groups\`(id),
+          INDEX idx_groupId (groupId)
+        )`
+      ];
+    }
+
+    for (const statement of statements) {
+      await dbPool.query(statement);
+    }
+  }
+
+  await dbPool.query(
+    `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
+     VALUES ('default', 'Default Group', 'Default user group', JSON_ARRAY('view_dashboard','view_nodes','edit_pages'))`
+  );
+  await dbPool.query(
+    `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
+     VALUES ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard','view_nodes','edit_nodes','edit_pages','manage_users','manage_groups','view_logs','system_admin'))`
+  );
+  const adminPassword = 'admin123';
+  const adminPasswordHash = await bcryptjs.hash(adminPassword, 10);
+  const adminPasswordSha = sha256Hex(adminPassword);
+
+  await dbPool.query(
+    `INSERT INTO users (userId, username, email, passwordHash, passwordSha256, groupId, isActive)
+     VALUES ('admin-user-001', 'admin', 'admin@meshnet.local', ?, ?,
+             (SELECT id FROM \`groups\` WHERE groupId='admin'), TRUE)
+     ON DUPLICATE KEY UPDATE
+       passwordHash = VALUES(passwordHash),
+       passwordSha256 = VALUES(passwordSha256),
+       isActive = TRUE`,
+    [adminPasswordHash, adminPasswordSha]
+  );
 }
 
 async function initializeDatabase() {
@@ -80,6 +162,7 @@ async function initializeDatabase() {
     connection.release();
     
     console.log('✓ Database connection pool created and tested');
+    await ensureDatabaseSchema();
   } catch (error) {
     console.error('✗ Database connection failed:', error.message);
     // Don't exit - continue with placeholder
@@ -277,7 +360,16 @@ app.post('/api/pings', async (req, res) => {
       'INSERT INTO pings (nodeId, status, latencyMs) VALUES (?, ?, ?)',
       [nodeId, status || 'unknown', latencyMs || null]
     );
-    res.json({ success: true });
+    let version = null;
+    try {
+      const [rows] = await dbPool.query('SELECT version FROM nodes WHERE nodeId = ? LIMIT 1', [nodeId]);
+      if (rows.length > 0) {
+        version = rows[0].version || null;
+      }
+    } catch (versionError) {
+      console.warn('Ping version lookup failed:', versionError.message);
+    }
+    res.json({ success: true, version });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -566,7 +658,16 @@ app.post('/api/pings', async (req, res) => {
       'INSERT INTO pings (nodeId, status, latencyMs) VALUES (?, ?, ?)',
       [nodeId, status || 'unknown', latencyMs || null]
     );
-    res.json({ success: true });
+    let version = null;
+    try {
+      const [rows] = await dbPool.query('SELECT version FROM nodes WHERE nodeId = ? LIMIT 1', [nodeId]);
+      if (rows.length > 0) {
+        version = rows[0].version || null;
+      }
+    } catch (versionError) {
+      console.warn('Ping version lookup failed:', versionError.message);
+    }
+    res.json({ success: true, version });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

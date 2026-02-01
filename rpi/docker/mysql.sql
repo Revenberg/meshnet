@@ -198,7 +198,7 @@ INSERT IGNORE INTO `groups` (groupId, name, description, permissions) VALUES
 INSERT IGNORE INTO `groups` (groupId, name, description, permissions) VALUES 
   ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard', 'view_nodes', 'edit_nodes', 'edit_pages', 'manage_users', 'manage_groups', 'view_logs', 'system_admin'));
 
--- Insert admin user (password: admin)
--- Hash generated: $2a$10$tMqpSZ88CVRXAbAN/EOJU.WiwY58B67fYROYR0.45KZzOWLYh/bVG
-INSERT IGNORE INTO users (userId, username, email, passwordHash, groupId, isActive) VALUES 
-  ('admin-user-001', 'admin', 'admin@meshnet.local', '$2a$10$tMqpSZ88CVRXAbAN/EOJU.WiwY58B67fYROYR0.45KZzOWLYh/bVG', (SELECT id FROM `groups` WHERE groupId='admin'), TRUE);
+-- Insert admin user (password: admin123)
+-- Hash generated: $2a$10$sHsFFvNhyOo3ZvaQZ0eDI.L1PltRaSPI6fGEiEH8gkj8Fc49fz4nK
+INSERT IGNORE INTO users (userId, username, email, passwordHash, passwordSha256, groupId, isActive) VALUES 
+  ('admin-user-001', 'admin', 'admin@meshnet.local', '$2a$10$sHsFFvNhyOo3ZvaQZ0eDI.L1PltRaSPI6fGEiEH8gkj8Fc49fz4nK', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', (SELECT id FROM `groups` WHERE groupId='admin'), TRUE);

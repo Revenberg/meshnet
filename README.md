@@ -61,6 +61,11 @@ MeshNet/
 
 ### RPI Setup (Raspberry Pi 4)
 
+**One-liner (GhostNet, Docker Compose aanwezig)**
+```bash
+git clone https://github.com/Revenberg/meshnet.git; cd meshnet/rpi/docker; ./detect_serial_and_start.sh
+```
+
 1. **Prerequisites**
    ```bash
    sudo apt-get update
@@ -78,6 +83,40 @@ MeshNet/
 3. **Access Dashboard**
    - Open browser: `http://<rpi-ip>`
    - Backend API: `http://<rpi-ip>:3001`
+
+## 🔐 SSH key setup (GhostNet)
+
+### Op de laptop
+```powershell
+cd $env:USERPROFILE\.ssh
+ssh-keygen
+# alles Enter
+# copieer inhoud van .pub file naar klipbord
+```
+
+### Op de RPI host
+```bash
+cd ~/meshnet
+git config pull.ff only
+
+sudo adduser copilot
+sudo usermod -aG sudo copilot
+sudo usermod -aG docker copilot
+
+mkdir -p ~/.ssh
+touch ~/.ssh/authorized_keys
+# voeg klipboard toe aan ~/.ssh/authorized_keys
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### Werkend statement
+```bash
+ssh copilot@GhostNet "cd ~/meshnet;git pull;cd ~/meshnet/rpi/docker;chmod +x *.sh;./detect_serial_and_start.sh"
+```
+
+## ✅ TODO
+- Hoe zet ik een gecompileerde `.ino` (of `.bin`) naar de RPI USB‑poort?
 
 ### Node Setup (Heltec V3)
 

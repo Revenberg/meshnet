@@ -1,8 +1,8 @@
 # PowerShell Test Script for MeshNet Node Web Hosting API
 # Usage: .\test-node-api.ps1
 
-Write-Host "🧪 MeshNet Node Web Hosting API Test Suite" -ForegroundColor Cyan
-Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "MeshNet Node Web Hosting API Test Suite" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Node IDs (hardcoded from setup)
@@ -45,20 +45,20 @@ function Run-Test {
         $httpCode = $response.StatusCode
         
         if ($httpCode -eq $expectedCode) {
-            Write-Host "✓ PASS" -ForegroundColor Green -NoNewline
+            Write-Host "PASS" -ForegroundColor Green -NoNewline
             Write-Host " (HTTP $httpCode)"
             $script:pass_count += 1
             return $response
         }
         else {
-            Write-Host "✗ FAIL" -ForegroundColor Red -NoNewline
+            Write-Host "FAIL" -ForegroundColor Red -NoNewline
             Write-Host " (Expected $expectedCode, got $httpCode)"
             $script:fail_count += 1
             return $null
         }
     }
     catch {
-        Write-Host "✗ FAIL" -ForegroundColor Red -NoNewline
+        Write-Host "FAIL" -ForegroundColor Red -NoNewline
         Write-Host " (Error: $($_.Exception.Message))"
         $script:fail_count += 1
         return $null
@@ -66,7 +66,7 @@ function Run-Test {
 }
 
 # Test: List pages for nodes
-Write-Host "📋 Test: Get Pages for Nodes" -ForegroundColor Cyan
+Write-Host "Test: Get Pages for Nodes" -ForegroundColor Cyan
 Write-Host ""
 
 $response = Run-Test "List pages for MeshNode-1" `
@@ -94,7 +94,7 @@ if ($response) {
 Write-Host ""
 
 # Test: Get page content
-Write-Host "📄 Test: Get Page Content" -ForegroundColor Cyan
+Write-Host "Test: Get Page Content" -ForegroundColor Cyan
 Write-Host ""
 
 # Get first page ID from Node 1
@@ -116,7 +116,7 @@ if ($json.pages.Count -gt 0) {
 Write-Host ""
 
 # Test: Node information
-Write-Host "📡 Test: Node Information" -ForegroundColor Cyan
+Write-Host "Test: Node Information" -ForegroundColor Cyan
 Write-Host ""
 
 $response = Run-Test "Get MeshNode-1 info" `
@@ -146,7 +146,7 @@ if ($response) {
 Write-Host ""
 
 # Test: Heartbeat
-Write-Host "💓 Test: Heartbeat" -ForegroundColor Cyan
+Write-Host "Test: Heartbeat" -ForegroundColor Cyan
 Write-Host ""
 
 $heartbeatPayload = @{
@@ -160,7 +160,7 @@ Run-Test "Send heartbeat for MeshNode-1" `
 Write-Host ""
 
 # Test: Error cases
-Write-Host "❌ Test: Error Cases" -ForegroundColor Cyan
+Write-Host "Test: Error Cases" -ForegroundColor Cyan
 Write-Host ""
 
 Run-Test "Non-existent node pages (empty result)" `
@@ -170,7 +170,7 @@ Write-Host ""
 # Summary
 Write-Host "==========================================" -ForegroundColor Cyan
 if ($fail_count -eq 0) {
-    Write-Host "✓ All tests passed!" -ForegroundColor Green
+    Write-Host "All tests passed!" -ForegroundColor Green
 }
 Write-Host "Test Results: " -NoNewline
 Write-Host "$pass_count passed" -ForegroundColor Green -NoNewline

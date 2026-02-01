@@ -5,6 +5,8 @@
 - Heltec node flashed with MeshNet 0.9.4
 - Node connected to RPI serial (gateway) or to PC for serial logs
 - If gateway serial is not auto-detected, set SERIAL_PORT in rpi/docker/.env and restart lora-gateway
+- Serial check (COM5/COM7) returned no data in 3s window (needs device output)
+- Version check: missing versions for TEST:NODE:MAC:01, AA:BB:CC:DD:EE:FF, BB:CC:DD:EE:FF:AA, A4:C1:38:12:34:56
 
 ## A) Automated/Local Tests
 - [x] lora-gateway unit tests: run `npm test` in rpi/lora-gateway (serialConfig tests)
@@ -12,37 +14,37 @@
 
 ## B) Docker API Endpoint Tests (Backend)
 ### Health + Core
-- [ ] GET /health returns status ok + timestamp
-- [ ] GET /api/nodes returns list (empty allowed if no DB)
-- [ ] GET /api/nodes/:nodeId returns 404 for unknown id
+- [x] GET /health returns status ok + timestamp
+- [x] GET /api/nodes returns list (empty allowed if no DB)
+- [x] GET /api/nodes/:nodeId returns 404 for unknown id
 
 ### Users
-- [ ] GET /api/users returns list (empty allowed)
-- [ ] POST /api/users with username/password/groupId creates user
-- [ ] GET /api/users/:userId returns created user
-- [ ] PUT /api/users/:userId updates username/password/groupId/isActive
-- [ ] DELETE /api/users/:userId removes user
+- [x] GET /api/users returns list (empty allowed)
+- [x] POST /api/users with username/password/groupId creates user
+- [x] GET /api/users/:userId returns created user
+- [x] PUT /api/users/:userId updates username/password/groupId/isActive
+- [x] DELETE /api/users/:userId removes user
 
 ### Auth
-- [ ] POST /api/auth/login with valid credentials returns success + user
-- [ ] POST /api/auth/login with invalid credentials returns 401
-- [ ] DELETE /api/auth/logout/:userId returns success
+- [x] POST /api/auth/login with valid credentials returns success + user
+- [x] POST /api/auth/login with invalid credentials returns 401
+- [x] DELETE /api/auth/logout/:userId returns success
 
 ### Sync for nodes
-- [ ] GET /api/sync/users returns { status, user_count, users[] }
-- [ ] GET /api/sync/pages returns { status, page_count, pages[] }
+- [x] GET /api/sync/users returns { status, user_count, users[] }
+- [x] GET /api/sync/pages returns { status, page_count, pages[] }
 
 ### ACK/Ping/Message
-- [ ] POST /api/acks stores ACK (msgId + nodeId required)
-- [ ] POST /api/pings stores ping (nodeId required)
-- [ ] POST /api/messages stores message log (nodeId required)
+- [x] POST /api/acks stores ACK (msgId + nodeId required)
+- [x] POST /api/pings stores ping (nodeId required)
+- [x] POST /api/messages stores message log (nodeId required)
 
 ### Nodes write paths
-- [ ] POST /api/nodes creates a node (nodeId optional)
-- [ ] POST /api/nodes/register upserts node by nodeId
-- [ ] POST /api/nodes/:nodeId/update updates lastSeen and metrics
-- [ ] PUT /api/nodes/:nodeId updates node fields
-- [ ] DELETE /api/nodes/:nodeId removes node
+- [x] POST /api/nodes creates a node (nodeId optional)
+- [x] POST /api/nodes/register upserts node by nodeId
+- [x] POST /api/nodes/:nodeId/update updates lastSeen and metrics
+- [x] PUT /api/nodes/:nodeId updates node fields
+- [x] DELETE /api/nodes/:nodeId removes node
 
 ## 1) API & Database
 - [ ] Open http://<RPI-IP>/users and add a user (username, team, password)
