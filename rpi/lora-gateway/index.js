@@ -125,7 +125,7 @@ async function handleLoRaMessage(data) {
       return;
     }
 
-    if (message.startsWith('BEACON;')) {
+    if (message.includes('BEACON;')) {
       await handleBeacon(message);
       return;
     }
@@ -288,8 +288,8 @@ function handleMetrics(message) {
 }
 
 async function handleBeacon(message) {
-  const parts = message.split(';');
-  const nodeId = parts[1] || '';
+  const match = message.match(/BEACON;([^;\s]+)/);
+  const nodeId = match?.[1] || '';
   if (!nodeId) return;
 
   connectedNodes.set(nodeId, {
