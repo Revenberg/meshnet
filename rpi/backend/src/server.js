@@ -514,6 +514,13 @@ app.post('/api/nodes/register', async (req, res) => {
       'INSERT INTO nodes (nodeId, macAddress, functionalName, version, isActive, battery, `signalStrength`, lastSeen) VALUES (?, ?, ?, ?, true, 100, 0, NOW()) ON DUPLICATE KEY UPDATE functionalName = COALESCE(?, functionalName), version = COALESCE(?, version), lastSeen = NOW()',
       [nodeId, macAddress, functionalName || nodeId, resolvedVersion, functionalName || null, resolvedVersion]
     );
+
+    if (resolvedVersion) {
+      await dbPool.query(
+        'UPDATE nodes SET version = COALESCE(version, ?) WHERE nodeId = ? OR macAddress = ?',
+        [resolvedVersion, nodeId, macAddress]
+      );
+    }
     res.json({ success: true, status: 'registered' });
   } catch (error) {
     res.status(500).json({ error: error.message });
