@@ -1039,7 +1039,8 @@ app.post('/api/broadcast', async (req, res) => {
       };
       
       try {
-        const loraResponse = await axios.post('http://lora-gateway:3002/relay/broadcast', broadcastPayload, {
+        const loraGatewayUrl = process.env.LORA_GATEWAY_URL || 'http://127.0.0.1:3002';
+        const loraResponse = await axios.post(`${loraGatewayUrl}/relay/broadcast`, broadcastPayload, {
           timeout: 5000
         });
         console.log(`[BROADCAST] Relayed to LoraGateway: ${loraResponse.data.message}`);

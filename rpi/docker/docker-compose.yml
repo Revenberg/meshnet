@@ -32,6 +32,7 @@ services:
       - DB_USER=meshnet
       - DB_PASSWORD=meshnet_secure_pwd
       - DB_NAME=meshnet
+      - LORA_GATEWAY_URL=http://127.0.0.1:3002
     ports:
       - "3001:3001"
     depends_on:
