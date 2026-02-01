@@ -28,6 +28,13 @@ function sha256Hex(value) {
   return crypto.createHash('sha256').update(value || '').digest('hex');
 }
 
+function extractMacFromNodeId(nodeId) {
+  if (!nodeId) return null;
+  const match = nodeId.match(/([0-9A-Fa-f]{12})/);
+  if (!match) return null;
+  return match[1].match(/.{1,2}/g).join(':').toUpperCase();
+}
+
 // ============ MIDDLEWARE ============
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -493,9 +500,10 @@ app.post('/api/nodes/register', async (req, res) => {
     if (!dbPool) return res.json({ success: true, warning: 'Database not available' });
     const { nodeId, functionalName, version } = req.body;
     if (!nodeId) return res.status(400).json({ error: 'nodeId required' });
+    const macAddress = extractMacFromNodeId(nodeId) || nodeId.substring(0, 17);
     await dbPool.query(
       'INSERT INTO nodes (nodeId, macAddress, functionalName, version, isActive, battery, `signalStrength`, lastSeen) VALUES (?, ?, ?, ?, true, 100, 0, NOW()) ON DUPLICATE KEY UPDATE functionalName = COALESCE(?, functionalName), version = COALESCE(?, version), lastSeen = NOW()',
-      [nodeId, nodeId, functionalName || nodeId, version || null, functionalName || null, version || null]
+      [nodeId, macAddress, functionalName || nodeId, version || null, functionalName || null, version || null]
     );
     res.json({ success: true, status: 'registered' });
   } catch (error) {
