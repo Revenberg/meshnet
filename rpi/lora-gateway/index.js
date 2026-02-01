@@ -223,6 +223,12 @@ async function handlePong(message) {
   const [, nodeId] = parts;
   try {
     await axios.post(`${BACKEND_URL}/api/pings`, { nodeId, status: 'ok' });
+    connectedNodes.set(nodeId, {
+      nodeId,
+      lastSeen: new Date(),
+      status: 'online'
+    });
+    await axios.post(`${BACKEND_URL}/api/nodes/register`, { nodeId });
     lastAck.set(nodeId, Date.now());
   } catch (error) {
     console.error('[PONG] Error:', error.message);
