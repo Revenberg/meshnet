@@ -11,6 +11,35 @@ const session = require('express-session');
 const app = express();
 const PORT = process.env.PORT || 80;
 const API_URL = process.env.API_URL || 'http://localhost:3001';
+const API_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || '5000');
+const API_RETRIES = Number(process.env.API_RETRIES || '3');
+const API_RETRY_DELAY_MS = Number(process.env.API_RETRY_DELAY_MS || '750');
+
+const apiClient = axios.create({
+  baseURL: API_URL,
+  timeout: API_TIMEOUT_MS
+});
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function apiGet(path, options = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= API_RETRIES; attempt += 1) {
+    try {
+      return await apiClient.get(path, options);
+    } catch (error) {
+      lastError = error;
+      const code = error.code || error.response?.status || 'UNKNOWN';
+      console.warn(`[API] GET ${path} failed (attempt ${attempt}/${API_RETRIES}):`, code);
+      if (attempt < API_RETRIES) {
+        await sleep(API_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+  throw lastError;
+}
 
 // ============ SESSION CONFIGURATION ============
 app.use(session({
@@ -125,9 +154,9 @@ app.get('/logout', async (req, res) => {
 app.get('/', requireLogin, async (req, res) => {
   try {
     const [nodesRes, groupsRes, usersRes] = await Promise.all([
-      axios.get(`${API_URL}/api/nodes`),
-      axios.get(`${API_URL}/api/groups`),
-      axios.get(`${API_URL}/api/users`)
+      apiGet('/api/nodes'),
+      apiGet('/api/groups'),
+      apiGet('/api/users')
     ]);
     
     res.render('index', {
@@ -154,7 +183,7 @@ app.get('/', requireLogin, async (req, res) => {
 // Nodes management page
 app.get('/nodes', requireLogin, async (req, res) => {
   try {
-    const response = await axios.get(`${API_URL}/api/nodes`);
+    const response = await apiGet('/api/nodes');
     res.render('nodes', {
       nodes: response.data,
       user: req.session.user,
@@ -175,7 +204,7 @@ app.get('/nodes', requireLogin, async (req, res) => {
 // Mobile-optimized nodes management page
 app.get('/nodes-mobile', requireLogin, async (req, res) => {
   try {
-    const response = await axios.get(`${API_URL}/api/nodes`);
+    const response = await apiGet('/api/nodes');
     res.render('nodes-mobile', {
       nodes: response.data,
       user: req.session.user,
@@ -196,14 +225,14 @@ app.get('/nodes-mobile', requireLogin, async (req, res) => {
 // Node connections dashboard
 app.get('/node-connections', requireLogin, async (req, res) => {
   try {
-    const response = await axios.get(`${API_URL}/api/nodes`);
+    const response = await apiGet('/api/nodes');
     const nodes = response.data;
     
     // Get connections for each node
     const nodesWithConnections = await Promise.all(
       nodes.map(async (node) => {
         try {
-          const connRes = await axios.get(`${API_URL}/api/host/node/${node.nodeId}/connections`);
+          const connRes = await apiGet(`/api/host/node/${node.nodeId}/connections`);
           return {
             ...node,
             connections: connRes.data.connections || []
@@ -239,8 +268,8 @@ app.get('/node-connections', requireLogin, async (req, res) => {
 app.get('/users', requireLogin, async (req, res) => {
   try {
     const [usersRes, groupsRes] = await Promise.all([
-      axios.get(`${API_URL}/api/users`),
-      axios.get(`${API_URL}/api/groups`)
+      apiGet('/api/users'),
+      apiGet('/api/groups')
     ]);
     
     let filteredUsers = usersRes.data;
@@ -289,8 +318,8 @@ app.get('/users', requireLogin, async (req, res) => {
 app.get('/groups', requireLogin, async (req, res) => {
   try {
     const [groupsRes, usersRes] = await Promise.all([
-      axios.get(`${API_URL}/api/groups`),
-      axios.get(`${API_URL}/api/users`)
+      apiGet('/api/groups'),
+      apiGet('/api/users')
     ]);
     
     // Count members per group
@@ -337,9 +366,9 @@ app.get('/groups', requireLogin, async (req, res) => {
 app.get('/pages', requireLogin, async (req, res) => {
   try {
     const [groupsRes, nodesRes, pagesRes] = await Promise.all([
-      axios.get(`${API_URL}/api/groups`),
-      axios.get(`${API_URL}/api/nodes`),
-      axios.get(`${API_URL}/api/pages/all`) // Get all pages, not just active ones
+      apiGet('/api/groups'),
+      apiGet('/api/nodes'),
+      apiGet('/api/pages/all') // Get all pages, not just active ones
     ]);
     
     // Create a map of node IDs to names
@@ -374,8 +403,8 @@ app.get('/pages', requireLogin, async (req, res) => {
 app.get('/broadcast', requireLogin, async (req, res) => {
   try {
     const [nodesRes, pagesRes] = await Promise.all([
-      axios.get(`${API_URL}/api/nodes`),
-      axios.get(`${API_URL}/api/pages`)
+      apiGet('/api/nodes'),
+      apiGet('/api/pages')
     ]);
     
     res.render('broadcast', {
@@ -400,8 +429,8 @@ app.get('/broadcast', requireLogin, async (req, res) => {
 app.get('/monitoring', async (req, res) => {
   try {
     const [nodesRes, topologyRes] = await Promise.all([
-      axios.get(`${API_URL}/api/nodes`),
-      axios.get(`${API_URL}/api/topology`)
+      apiGet('/api/nodes'),
+      apiGet('/api/topology')
     ]);
     
     res.render('monitoring', {
@@ -438,7 +467,7 @@ app.post('/api/nodes', async (req, res) => {
 // Get single node
 app.get('/api/nodes/:nodeId', async (req, res) => {
   try {
-    const response = await axios.get(`${API_URL}/api/nodes/${req.params.nodeId}`);
+    const response = await apiGet(`/api/nodes/${req.params.nodeId}`);
     res.json(response.data);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -599,7 +628,7 @@ io.on('connection', (socket) => {
   socket.on('subscribe-nodes', async () => {
     socket.join('nodes');
     try {
-      const response = await axios.get(`${API_URL}/api/nodes`);
+      const response = await apiGet('/api/nodes');
       socket.emit('nodes-list', response.data);
     } catch (error) {
       console.error('Failed to fetch nodes:', error.message);
@@ -611,8 +640,8 @@ io.on('connection', (socket) => {
     socket.join('monitoring');
     try {
       const [nodesRes, topologyRes] = await Promise.all([
-        axios.get(`${API_URL}/api/nodes`),
-        axios.get(`${API_URL}/api/topology`)
+        apiGet('/api/nodes'),
+        apiGet('/api/topology')
       ]);
       
       const avgSignal = nodesRes.data.length > 0 
@@ -640,8 +669,8 @@ io.on('connection', (socket) => {
     socket.join('dashboard');
     try {
       const [nodesRes, groupsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/nodes`),
-        axios.get(`${API_URL}/api/groups`)
+        apiGet('/api/nodes'),
+        apiGet('/api/groups')
       ]);
       
       socket.emit('dashboard-data', {
@@ -673,7 +702,7 @@ io.on('connection', (socket) => {
 // Emit updates at regular intervals
 setInterval(async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/nodes`);
+    const response = await apiGet('/api/nodes');
     if (response.data.length > 0) {
       io.to('monitoring').emit('nodes-update', {
         nodes: response.data,

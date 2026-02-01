@@ -52,6 +52,8 @@ const fs = require('fs');
 const mysql = require('mysql2/promise');
 
 let dbPool;
+let dbReady = false;
+let dbRetryTimer = null;
 
 // Test hook (used by automated tests)
 function setDbPoolForTests(pool) {
@@ -150,7 +152,7 @@ async function ensureDatabaseSchema() {
 async function initializeDatabase() {
   try {
     console.log(`Connecting to database: ${process.env.DB_HOST}:${process.env.DB_PORT}`);
-    
+
     dbPool = mysql.createPool({
       host: process.env.DB_HOST || 'mysql',
       port: process.env.DB_PORT || 3306,
@@ -161,20 +163,24 @@ async function initializeDatabase() {
       connectionLimit: 10,
       queueLimit: 0,
       enableKeepAlive: true,
-      keepAliveInitialDelayMs: 0,
-      connectionTimeout: 10000
+      connectTimeout: 10000
     });
-    
+
     // Test connection
     const connection = await dbPool.getConnection();
     connection.release();
-    
+
     console.log('✓ Database connection pool created and tested');
     await ensureDatabaseSchema();
+    dbReady = true;
+    return true;
   } catch (error) {
+    dbReady = false;
+    dbPool = null;
     console.error('✗ Database connection failed:', error.message);
     // Don't exit - continue with placeholder
     console.log('⚠ Backend running without database (Phase 2 testing)');
+    return false;
   }
 }
 
@@ -1045,7 +1051,22 @@ app.use((err, req, res, next) => {
 // ============ SERVER START ============
 async function startServer() {
   try {
-    await initializeDatabase();
+    const initialized = await initializeDatabase();
+
+    if (!initialized && !dbRetryTimer) {
+      dbRetryTimer = setInterval(async () => {
+        if (dbReady) {
+          clearInterval(dbRetryTimer);
+          dbRetryTimer = null;
+          return;
+        }
+        const ok = await initializeDatabase();
+        if (ok) {
+          clearInterval(dbRetryTimer);
+          dbRetryTimer = null;
+        }
+      }, 10000);
+    }
 
     // Cleanup old ACKs every hour
     setInterval(async () => {
