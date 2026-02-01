@@ -35,6 +35,12 @@ function extractMacFromNodeId(nodeId) {
   return match[1].match(/.{1,2}/g).join(':').toUpperCase();
 }
 
+function extractVersionFromNodeId(nodeId) {
+  if (!nodeId) return null;
+  const match = nodeId.match(/_(\d+\.\d+\.\d+)$/);
+  return match ? match[1] : null;
+}
+
 // ============ MIDDLEWARE ============
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -503,9 +509,10 @@ app.post('/api/nodes/register', async (req, res) => {
     const { nodeId, functionalName, version } = req.body;
     if (!nodeId) return res.status(400).json({ error: 'nodeId required' });
     const macAddress = extractMacFromNodeId(nodeId) || nodeId.substring(0, 17);
+    const resolvedVersion = version || extractVersionFromNodeId(nodeId) || null;
     await dbPool.query(
       'INSERT INTO nodes (nodeId, macAddress, functionalName, version, isActive, battery, `signalStrength`, lastSeen) VALUES (?, ?, ?, ?, true, 100, 0, NOW()) ON DUPLICATE KEY UPDATE functionalName = COALESCE(?, functionalName), version = COALESCE(?, version), lastSeen = NOW()',
-      [nodeId, macAddress, functionalName || nodeId, version || null, functionalName || null, version || null]
+      [nodeId, macAddress, functionalName || nodeId, resolvedVersion, functionalName || null, resolvedVersion]
     );
     res.json({ success: true, status: 'registered' });
   } catch (error) {
