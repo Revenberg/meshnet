@@ -23,6 +23,9 @@ Thumbs.db
 rpi/docker/mysql/data/
 rpi/docker/mysql/*.sock
 
+# Mosquitto runtime data
+rpi/docker/mosquitto/data/
+
 # Build artifacts
 **/dist/
 **/build/
