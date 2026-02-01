@@ -194,7 +194,7 @@ async function handleUsersRequest(nodeId) {
 
 async function handlePagesRequest(nodeId) {
   try {
-    const res = await axios.get(`${BACKEND_URL}/api/sync/pages`);
+    const res = await axios.get(`${BACKEND_URL}/api/sync/pages`, { params: { nodeId } });
     const pages = res.data.pages || [];
     const payload = pages.map(p => `${p.team}|${encodeURIComponent(p.html || '')}`).join(';');
     await sendSerialRaw(`RESP;PAGES;${payload}`);

@@ -372,9 +372,14 @@ app.get('/api/sync/users', async (req, res) => {
 app.get('/api/sync/pages', async (req, res) => {
   try {
     if (!dbPool) return res.json({ status: 'success', page_count: 0, pages: [] });
-    const [pages] = await dbPool.query(
-      'SELECT g.name AS team, p.content AS html FROM pages p LEFT JOIN `groups` g ON p.groupId = g.id WHERE p.isActive = true'
-    );
+    const nodeId = req.query.nodeId || null;
+    let pagesQuery = 'SELECT g.name AS team, p.content AS html FROM pages p LEFT JOIN `groups` g ON p.groupId = g.id WHERE p.isActive = true';
+    const params = [];
+    if (nodeId) {
+      pagesQuery += ' AND p.nodeId = ?';
+      params.push(nodeId);
+    }
+    const [pages] = await dbPool.query(pagesQuery, params);
     res.json({ status: 'success', page_count: pages.length, pages });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
