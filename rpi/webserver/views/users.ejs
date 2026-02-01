@@ -216,7 +216,7 @@ async function saveUser() {
         password,
         groupId: parseInt(groupId)
       });
-      if (response.data.status === 'created') {
+      if (response.data.success || response.data.userId || response.data.status === 'created') {
         closeModal('userModal');
         location.reload();
       }
