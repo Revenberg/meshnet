@@ -401,15 +401,17 @@ app.post('/api/pings', async (req, res) => {
       [nodeId, status || 'unknown', latencyMs || null]
     );
     let version = null;
+    let signalStrength = null;
     try {
-      const [rows] = await dbPool.query('SELECT version FROM nodes WHERE nodeId = ? LIMIT 1', [nodeId]);
+      const [rows] = await dbPool.query('SELECT version, signalStrength FROM nodes WHERE nodeId = ? LIMIT 1', [nodeId]);
       if (rows.length > 0) {
         version = rows[0].version || null;
+        signalStrength = rows[0].signalStrength ?? null;
       }
     } catch (versionError) {
       console.warn('Ping version lookup failed:', versionError.message);
     }
-    res.json({ success: true, version });
+    res.json({ success: true, version, signalStrength });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
