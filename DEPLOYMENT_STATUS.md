@@ -118,7 +118,7 @@ Use the current checklist in TEST_CHECKLIST.md.
 ## ⚠️ Current Issues
 - lora-gateway reports: "Serial not connected, skipping transmission" or "Operation not permitted".
     - Ensure the gateway Heltec is connected to the RPI USB port.
-    - On RPI/Linux, verify the device is visible as /dev/ttyUSB* and that the container has /dev mounted read/write.
+    - On RPI/Linux, verify the device is visible as /dev/ttyUSB* and that the container has /dev mounted read/write and explicit device access (devices mapping).
     - Restart lora-gateway after connecting the device.
     - Optional override: set SERIAL_PORT and SERIAL_BAUD in the lora-gateway environment.
     - docker-compose exposes SERIAL_PORT/SERIAL_BAUD for lora-gateway.

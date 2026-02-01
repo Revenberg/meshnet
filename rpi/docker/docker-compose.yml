@@ -115,6 +115,9 @@ services:
     networks:
       - meshnet-network
     restart: unless-stopped
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyACM0:/dev/ttyACM0
     volumes:
       - /dev:/dev  # USB access to Heltec device (read/write)
 
