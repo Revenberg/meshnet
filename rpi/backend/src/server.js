@@ -123,6 +123,14 @@ async function ensureDatabaseSchema() {
     `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
      VALUES ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard','view_nodes','edit_nodes','edit_pages','manage_users','manage_groups','view_logs','system_admin','view_users','send_broadcast'))`
   );
+
+  await dbPool.query(
+    `UPDATE \`groups\` SET permissions = JSON_ARRAY() WHERE groupId = 'default'`
+  );
+  await dbPool.query(
+    `UPDATE \`groups\` SET permissions = JSON_ARRAY('view_dashboard','view_nodes','edit_nodes','edit_pages','manage_users','manage_groups','view_logs','system_admin','view_users','send_broadcast')
+     WHERE groupId = 'admin'`
+  );
   const adminPassword = 'admin123';
   const adminPasswordHash = await bcryptjs.hash(adminPassword, 10);
   const adminPasswordSha = sha256Hex(adminPassword);
