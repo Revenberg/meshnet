@@ -117,11 +117,11 @@ async function ensureDatabaseSchema() {
 
   await dbPool.query(
     `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
-     VALUES ('default', 'Default Group', 'Default user group', JSON_ARRAY('view_dashboard','view_nodes','edit_pages'))`
+     VALUES ('default', 'Default Group', 'Default user group', JSON_ARRAY())`
   );
   await dbPool.query(
     `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
-     VALUES ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard','view_nodes','edit_nodes','edit_pages','manage_users','manage_groups','view_logs','system_admin'))`
+     VALUES ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard','view_nodes','edit_nodes','edit_pages','manage_users','manage_groups','view_logs','system_admin','view_users','send_broadcast'))`
   );
   const adminPassword = 'admin123';
   const adminPasswordHash = await bcryptjs.hash(adminPassword, 10);

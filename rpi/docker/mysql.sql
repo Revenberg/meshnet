@@ -193,10 +193,10 @@ CREATE TABLE IF NOT EXISTS broadcasts (
 
 -- Insert default groups
 INSERT IGNORE INTO `groups` (groupId, name, description, permissions) VALUES 
-  ('default', 'Default Group', 'Default user group', JSON_ARRAY('view_dashboard', 'view_nodes', 'edit_pages'));
+  ('default', 'Default Group', 'Default user group', JSON_ARRAY());
 
 INSERT IGNORE INTO `groups` (groupId, name, description, permissions) VALUES 
-  ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard', 'view_nodes', 'edit_nodes', 'edit_pages', 'manage_users', 'manage_groups', 'view_logs', 'system_admin'));
+  ('admin', 'Administrator', 'Administrator group with full access', JSON_ARRAY('view_dashboard', 'view_nodes', 'edit_nodes', 'edit_pages', 'manage_users', 'manage_groups', 'view_logs', 'system_admin', 'view_users', 'send_broadcast'));
 
 -- Insert admin user (password: admin123)
 -- Hash generated: $2a$10$sHsFFvNhyOo3ZvaQZ0eDI.L1PltRaSPI6fGEiEH8gkj8Fc49fz4nK
