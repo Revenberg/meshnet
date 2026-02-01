@@ -9,7 +9,7 @@
 // ====== Config ======
 #define DNS_PORT 53
 IPAddress apIP(192, 168, 3, 1);
-String AP_SSID = "MeshNet V0.9.4";
+String AP_SSID = "MeshNet V1.0.0";
 String AP_PASS = "";
 
 /*#define MAX_MSGS 20

@@ -21,7 +21,7 @@ void setup() {
     
     Serial.println("\n\n");
     Serial.println("╔════════════════════════════════════════╗");
-    Serial.println("║  🚀 MeshNet V0.9.4 - STARTING UP      ║");
+    Serial.println("║  🚀 MeshNet V1.0.0 - STARTING UP      ║");
     Serial.println("╚════════════════════════════════════════╝");
     Serial.println("");
     
@@ -30,7 +30,7 @@ void setup() {
     Serial.printf("[VERSION]   Name: %s\n", FIRMWARE_NAME);
     Serial.printf("[VERSION]   Version: %s\n", FIRMWARE_VERSION);
     Serial.printf("[VERSION]   Build: %s %s\n", FIRMWARE_BUILD_DATE, FIRMWARE_BUILD_TIME);
-    Serial.println("[VERSION] ✓ MeshNet V0.9.4 confirmed\n");
+    Serial.println("[VERSION] ✓ MeshNet V1.0.0 confirmed\n");
     
     RPI4::setup();
     User::setRuntimeCacheOnly(true);

@@ -17,11 +17,11 @@ lora_node.ino.bin            1,310 KB  (application firmware)
 ✅ **version.h** - Version macros added:
 ```cpp
 ````markdown
-# MeshNet V0.9.4 - Deployment Status
+# MeshNet V1.0.0 - Deployment Status
 
 ## ✅ Build Status: SUCCESS
 
-**Firmware Version:** MeshNet V0.9.4  
+**Firmware Version:** MeshNet V1.0.0  
 **Build Date:** January 31, 2026  
 **Build Path:** `C:\Users\reven\Documents\Arduino\MeshNet\node\lora_node\build\`
 
@@ -36,7 +36,7 @@ lora_node.ino.bin            1,360 KB  (application firmware)
 
 ## 🔌 Hardware Status
 
-### Flashed Devices (0.9.4)
+### Flashed Devices (1.0.0)
 | Port | Device | Status |
 |------|--------|--------|
 | COM5 | Heltec WiFi LoRa 32 V3 (MAC: 9c:13:9e:e9:a1:74) | ✅ Flashed OK |
@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File FLASH_ALL_CONNECTED.ps1
 This script will:
 1. ✅ Auto-detect ESP32-S3 devices on all COM ports
 2. ✅ Erase flash memory
-3. ✅ Write MeshNet V0.9.4 firmware
+3. ✅ Write MeshNet V1.0.0 firmware
 4. ✅ Verify boot sequence
 
 ### Option 2: Manual Flash (Single Device)
@@ -87,21 +87,21 @@ python -m esptool --chip esp32s3 --port $port --baud 57600 `
 ### Expected Boot Output
 ```
 ╔════════════════════════════════════════╗
-║  🚀 MeshNet V0.9.4 - STARTING UP      ║
+║  🚀 MeshNet V1.0.0 - STARTING UP      ║
 ╚════════════════════════════════════════╝
 
 [VERSION] Firmware Details:
 [VERSION]   Name: MeshNet
-[VERSION]   Version: 0.9.4
-[VERSION] ✓ MeshNet V0.9.4 confirmed
+[VERSION]   Version: 1.0.0
+[VERSION] ✓ MeshNet V1.0.0 confirmed
 
-[DEBUG] Soft AP started: MeshNet V0.9.4
+[DEBUG] Soft AP started: MeshNet V1.0.0
 [INFO] Async Webserver gestart
-[LoRa] Init OK, node = LoRA_<MAC>_0.9.4
+[LoRa] Init OK, node = LoRA_<MAC>_1.0.0
 ```
 
 ### WiFi Connection
-- **SSID:** `MeshNet V0.9.4`
+- **SSID:** `MeshNet V1.0.0`
 - **Password:** (empty/open)
 - **Web UI:** `http://192.168.3.1`
 
@@ -168,7 +168,7 @@ arduino-cli compile --fqbn esp32:esp32:heltec_wifi_lora_32_V3
 ---
 
 **Last Updated:** Jan 31, 2026  
-**Status:** 0.9.4 flashed to COM5 and COM7  
+**Status:** 1.0.0 flashed to COM5 and COM7  
 **Notes:** Continue with end-to-end tests and log any failures.
 
 ````
