@@ -118,6 +118,25 @@ async function ensureDatabaseSchema() {
   }
 
   await dbPool.query(
+    `CREATE TABLE IF NOT EXISTS nodes (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nodeId VARCHAR(64) UNIQUE NOT NULL,
+      macAddress VARCHAR(17) UNIQUE NOT NULL,
+      functionalName VARCHAR(32),
+      version VARCHAR(16),
+      lastSeen TIMESTAMP,
+      signalStrength INT,
+      battery INT,
+      connectedNodes INT DEFAULT 0,
+      isActive BOOLEAN DEFAULT TRUE,
+      createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_nodeId (nodeId),
+      INDEX idx_isActive (isActive)
+    )`
+  );
+
+  await dbPool.query(
     `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
      VALUES ('default', 'Default Group', 'Default user group', JSON_ARRAY())`
   );
