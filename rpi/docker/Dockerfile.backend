@@ -12,6 +12,9 @@ RUN npm install --production
 # Copy actual application code
 COPY src/ ./src/
 
+# Copy test files
+COPY __tests__/ ./__tests__/
+
 # Expose API port
 EXPOSE 3001
 
