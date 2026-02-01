@@ -116,7 +116,7 @@ services:
       - meshnet-network
     restart: unless-stopped
     volumes:
-      - /dev:/dev:ro  # USB access to Heltec device (read-only)
+      - /dev:/dev  # USB access to Heltec device (read/write)
 
 networks:
   meshnet-network:

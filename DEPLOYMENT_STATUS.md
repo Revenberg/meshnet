@@ -116,12 +116,28 @@ Use the current checklist in TEST_CHECKLIST.md.
 ---
 
 ## ⚠️ Current Issues
-- lora-gateway reports: "Serial not connected, skipping transmission" (no USB serial device detected in container).
+- lora-gateway reports: "Serial not connected, skipping transmission" or "Operation not permitted".
     - Ensure the gateway Heltec is connected to the RPI USB port.
-    - On RPI/Linux, verify the device is visible as /dev/ttyUSB* and that the container has /dev mapped.
+    - On RPI/Linux, verify the device is visible as /dev/ttyUSB* and that the container has /dev mounted read/write.
     - Restart lora-gateway after connecting the device.
     - Optional override: set SERIAL_PORT and SERIAL_BAUD in the lora-gateway environment.
-    - docker-compose now exposes SERIAL_PORT/SERIAL_BAUD for lora-gateway.
+    - docker-compose exposes SERIAL_PORT/SERIAL_BAUD for lora-gateway.
+
+---
+
+## 🖥️ Laptop Serial Logging (Monitoring)
+Use the laptop to read serial logs from the Heltec nodes while the RPI acts as LoRa gateway.
+
+### Single Port (COM5/COM7)
+```
+python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.log
+```
+
+### Two Ports (separate terminals)
+```
+python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.log
+python serial_monitor.py --port COM7 --baud 115200 --log-file logs\serial_COM7.log
+```
 
 ---
 
