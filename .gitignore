@@ -1,0 +1,29 @@
+# Node
+**/node_modules/
+**/npm-debug.log*
+**/yarn.lock
+**/pnpm-lock.yaml
+
+# Coverage
+**/coverage/
+
+# Logs
+**/logs/
+**/*.log
+
+# Environment
+**/.env
+**/.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker/MySQL runtime data
+rpi/docker/mysql/data/
+rpi/docker/mysql/*.sock
+
+# Build artifacts
+**/dist/
+**/build/
+**/*.map

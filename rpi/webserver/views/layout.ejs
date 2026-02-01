@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title><%= typeof title !== 'undefined' ? title : 'MeshNet' %></title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/mobile.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-brand">
+        <h1>MeshNet Dashboard</h1>
+      </div>
+      <ul class="nav-menu">
+        <li><a href="/" class="nav-link <%= currentPage === 'dashboard' ? 'active' : '' %>">Dashboard</a></li>
+        <li><a href="/nodes" class="nav-link <%= currentPage === 'nodes' ? 'active' : '' %>">Nodes</a></li>
+        <li><a href="/users" class="nav-link <%= currentPage === 'users' ? 'active' : '' %>">Users</a></li>
+        <li><a href="/groups" class="nav-link <%= currentPage === 'groups' ? 'active' : '' %>">Groups</a></li>
+        <li><a href="/pages" class="nav-link <%= currentPage === 'pages' ? 'active' : '' %>">Pages</a></li>
+        <li><a href="/monitoring" class="nav-link <%= currentPage === 'monitoring' ? 'active' : '' %>">Monitoring</a></li>
+        <li><a href="/broadcast" class="nav-link <%= currentPage === 'broadcast' ? 'active' : '' %>">📤 Broadcast</a></li>
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-error">
+          <%= error %>
+        </div>
+      <% } %>
+      <% if (typeof success !== 'undefined' && success) { %>
+        <div class="alert alert-success">
+          <%= success %>
+        </div>
+      <% } %>
+      
+      <%- body %>
+    </main>
+  </div>
+
+    <!-- Socket.io - Currently not configured, real-time updates disabled -->
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+  <script src="/js/client.js"></script>
+</body>
+</html>

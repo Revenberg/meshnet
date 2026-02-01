@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node Management - MeshNet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="light-theme">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">🌐 MeshNet Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/nodes">Nodes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/users">Users</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/groups">Groups</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/pages">Pages</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/broadcast">📤 Broadcast</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            👤 <%= user ? user.username : 'User' %>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/logout">Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <% if (error) { %>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <%= error %>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <% } %>
+
+<div class="page-header">
+  <h2>Node Management</h2>
+  <button class="btn btn-primary" onclick="openAddNodeModal()">+ Add Node</button>
+</div>
+
+<% 
+  // Helper function to check if node is recently active (within 60 seconds)
+  function isNodeOnline(node) {
+    if (!node.lastSeen) return false;
+    const lastSeenTime = new Date(node.lastSeen).getTime();
+    const currentTime = new Date().getTime();
+    const diffSeconds = (currentTime - lastSeenTime) / 1000;
+    return diffSeconds < 60;
+  }
+%>
+
+<div class="section">
+  <h3>All Nodes</h3>
+  <% if (nodes && nodes.length > 0) { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Node ID</th>
+          <th>MAC Address</th>
+          <th>Name</th>
+          <th>Version</th>
+          <th>Battery</th>
+          <th>Signal</th>
+          <th>Connected To</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% nodes.forEach(node => { %>
+          <tr>
+            <td><code><%= node.nodeId.substring(0, 16) %>...</code></td>
+            <td><code><%= node.macAddress %></code></td>
+            <td><strong><%= node.functionalName || 'Unnamed' %></strong></td>
+            <td><%= node.version || '-' %></td>
+            <td>
+              <span class="battery-indicator" data-battery="<%= node.battery || 0 %>">
+                <%= node.battery || '-' %>%
+              </span>
+            </td>
+            <td><%= node.signalStrength || '-' %> dBm</td>
+            <td><%= node.connectedNodes || 0 %> nodes</td>
+            <td>
+              <span class="status-badge status-<%= isNodeOnline(node) ? 'active' : 'inactive' %>">
+                <%= isNodeOnline(node) ? 'Online' : 'Offline' %>
+              </span>
+            </td>
+            <td>
+              <button class="btn btn-small btn-primary" onclick="editNode('<%= node.nodeId %>')">Edit</button>
+              <button class="btn btn-small btn-danger" onclick="deleteNode('<%= node.nodeId %>')">Delete</button>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } else { %>
+    <div class="empty-state">
+      <p>No nodes found</p>
+      <small>Nodes will appear here when they join the network</small>
+    </div>
+  <% } %>
+</div>
+
+<!-- Node Statistics -->
+<div class="section">
+  <h3>Node Statistics</h3>
+  <div class="stats-container">
+    <div class="stat-card">
+      <div class="stat-content">
+        <h3><%= nodes ? nodes.length : 0 %></h3>
+        <p>Total Nodes</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-content">
+        <h3><%= nodes ? nodes.filter(n => isNodeOnline(n)).length : 0 %></h3>
+        <p>Online</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-content">
+        <h3><%= nodes ? nodes.filter(n => !isNodeOnline(n)).length : 0 %></h3>
+        <p>Offline</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Node Modal -->
+<div id="nodeModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Add Node</h2>
+    </div>
+    <div class="modal-body">
+      <form id="nodeForm">
+        <input type="hidden" id="nodeId" name="nodeId">
+        <div class="form-group">
+          <label for="nodeName">Node Name</label>
+          <input type="text" id="nodeName" name="functionalName" placeholder="e.g., Living Room Sensor" required>
+        </div>
+        <div class="form-group">
+          <label for="nodeMac">MAC Address</label>
+          <input type="text" id="nodeMac" name="macAddress" placeholder="e.g., 00:1A:2B:3C:4D:5E" readonly>
+          <small class="text-muted">MAC address is set by the ESP32 device and cannot be changed</small>
+        </div>
+        <div class="form-group">
+          <label for="nodeVersion">Version</label>
+          <input type="text" id="nodeVersion" name="version" placeholder="e.g., 1.0.0">
+        </div>
+        <div class="form-group">
+          <label for="nodeStatus">Status</label>
+          <select id="nodeStatus" name="isActive">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('nodeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNode()">Save Node</button>
+    </div>
+  </div>
+</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="/js/client.js"></script>
+
+<script>
+let currentEditNodeId = null;
+
+function openAddNodeModal() {
+  currentEditNodeId = null;
+  document.getElementById('modalTitle').textContent = 'Add Node';
+  document.getElementById('nodeForm').reset();
+  document.getElementById('nodeId').value = '';
+  document.getElementById('nodeModal').classList.add('show');
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('show');
+}
+
+async function editNode(nodeId) {
+  try {
+    currentEditNodeId = nodeId;
+    console.log(`Loading node data for: ${nodeId}`);
+    const response = await axios.get(`/api/nodes/${nodeId}`);
+    const node = response.data;
+    
+    console.log('Node data loaded:', node);
+    document.getElementById('modalTitle').textContent = 'Edit Node';
+    document.getElementById('nodeId').value = node.nodeId;
+    document.getElementById('nodeName').value = node.functionalName || '';
+    document.getElementById('nodeMac').value = node.macAddress || '';
+    document.getElementById('nodeVersion').value = node.version || '';
+    document.getElementById('nodeStatus').value = node.isActive ? 'true' : 'false';
+    
+    document.getElementById('nodeModal').classList.add('show');
+  } catch (error) {
+    console.error('Error loading node:', error);
+    console.error('Error response:', error.response?.data);
+    console.error('Error message:', error.message);
+    alert(`Failed to load node data: ${error.response?.data?.error || error.message}`);
+  }
+}
+
+async function saveNode() {
+  try {
+    const nodeId = document.getElementById('nodeId').value;
+    const formData = {
+      functionalName: document.getElementById('nodeName').value,
+      version: document.getElementById('nodeVersion').value,
+      isActive: document.getElementById('nodeStatus').value === 'true'
+    };
+
+    if (!formData.functionalName) {
+      alert('Node name is required');
+      return;
+    }
+
+    // When adding new node, include macAddress. When editing, skip it (read-only from ESP32)
+    if (!nodeId) {
+      formData.macAddress = document.getElementById('nodeMac').value;
+      if (!formData.macAddress) {
+        alert('MAC address is required for new nodes');
+        return;
+      }
+    }
+
+    let response;
+    if (nodeId) {
+      // Edit existing node
+      response = await axios.put(`/api/nodes/${nodeId}`, formData);
+    } else {
+      // Add new node
+      response = await axios.post(`/api/nodes`, formData);
+    }
+
+    if (response.data.success) {
+      closeModal('nodeModal');
+      // Reload nodes list
+      location.reload();
+    } else {
+      alert('Error saving node: ' + (response.data.error || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error saving node:', error);
+    alert('Failed to save node: ' + (error.response?.data?.error || error.message));
+  }
+}
+
+async function deleteNode(nodeId) {
+  if (confirm('Are you sure you want to delete this node?')) {
+    try {
+      const response = await axios.delete(`/api/nodes/${nodeId}`);
+      if (response.data.success) {
+        location.reload();
+      } else {
+        alert('Error deleting node: ' + (response.data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error deleting node:', error);
+      alert('Failed to delete node');
+    }
+  }
+}
+</script>
+</body>
+</html>

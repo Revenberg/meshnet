@@ -1,0 +1,423 @@
+<!-- Mobile-Optimized Nodes Management -->
+<div class="nodes-container">
+  <div class="page-header">
+    <h1>Network Nodes</h1>
+    <button class="btn btn-primary" onclick="openModal('nodeModal')">+ Add Node</button>
+  </div>
+
+  <!-- Nodes Grid (Responsive) -->
+  <div class="nodes-grid" id="nodesGrid">
+    <!-- Dynamically populated -->
+  </div>
+
+  <!-- Node Card Template (Hidden) -->
+  <template id="nodeCardTemplate">
+    <div class="node-card" data-node-id="">
+      <div class="node-header">
+        <div class="node-title">
+          <h3 class="node-name"></h3>
+          <span class="node-mac"></span>
+        </div>
+        <span class="node-status"></span>
+      </div>
+      
+      <div class="node-body">
+        <div class="node-stat">
+          <span class="stat-label">Version</span>
+          <span class="stat-value node-version"></span>
+        </div>
+        <div class="node-stat">
+          <span class="stat-label">Battery</span>
+          <span class="stat-value node-battery"></span>
+        </div>
+        <div class="node-stat">
+          <span class="stat-label">Signal</span>
+          <span class="stat-value node-signal"></span>
+        </div>
+      </div>
+
+      <div class="node-footer">
+        <button class="btn btn-small btn-secondary" onclick="editNode('')">Edit</button>
+        <button class="btn btn-small btn-danger" onclick="deleteNode('')">Delete</button>
+      </div>
+    </div>
+  </template>
+</div>
+
+<!-- Edit Node Modal -->
+<div class="modal" id="nodeModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title" id="nodeModalTitle">Edit Node</h2>
+      <button class="modal-close" onclick="closeModal('nodeModal')">&times;</button>
+    </div>
+    
+    <form id="nodeForm" onsubmit="saveNode(event)">
+      <div class="form-group">
+        <label>Node Name</label>
+        <input type="text" id="nodeName" placeholder="e.g., Node 1" required>
+      </div>
+
+      <div class="form-group">
+        <label>MAC Address <span style="font-size: 0.8em; color: #999;">(Fixed from ESP32)</span></label>
+        <input type="text" id="nodeMac" readonly placeholder="MAC address from device">
+      </div>
+
+      <div class="form-group">
+        <label>Version</label>
+        <input type="text" id="nodeVersion" placeholder="e.g., 0.8.1">
+      </div>
+
+      <div class="form-group">
+        <label>Battery %</label>
+        <input type="number" id="nodeBattery" min="0" max="100" placeholder="0-100">
+      </div>
+
+      <div class="form-group">
+        <label>Signal Strength (dBm)</label>
+        <input type="number" id="nodeSignal" placeholder="-100 to 0">
+      </div>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="nodeActive"> Active
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save Node</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('nodeModal')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.nodes-container {
+  padding: 0;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* Responsive Grid */
+.nodes-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .nodes-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .nodes-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .nodes-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Node Card */
+.node-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+}
+
+.node-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.node-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.node-title {
+  flex: 1;
+}
+
+.node-title h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-mac {
+  font-size: 0.75rem;
+  opacity: 0.9;
+  font-family: monospace;
+}
+
+.node-status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.node-status.active {
+  background: #48bb78;
+  color: white;
+}
+
+.node-status.offline {
+  background: #f56565;
+  color: white;
+}
+
+.node-body {
+  padding: 1rem;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.node-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #718096;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.node-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #f7fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.node-footer button {
+  flex: 1;
+  min-height: 36px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.modal-actions button {
+  flex: 1;
+}
+
+/* Responsive Modal */
+@media (max-width: 600px) {
+  .modal-content {
+    max-width: 95%;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header button {
+    width: 100%;
+  }
+}
+</style>
+
+<script>
+let currentNodeId = null;
+
+// Load nodes on page load
+document.addEventListener('DOMContentLoaded', loadNodes);
+
+async function loadNodes() {
+  try {
+    const response = await axios.get('/api/nodes');
+    const nodes = response.data || [];
+    
+    const grid = document.getElementById('nodesGrid');
+    grid.innerHTML = '';
+    
+    nodes.forEach(node => {
+      const card = createNodeCard(node);
+      grid.appendChild(card);
+    });
+  } catch (error) {
+    console.error('Error loading nodes:', error);
+    alert('Failed to load nodes');
+  }
+}
+
+function createNodeCard(node) {
+  const template = document.getElementById('nodeCardTemplate');
+  const card = template.content.cloneNode(true);
+  
+  const nodeId = node.nodeId || node.id;
+  const cardEl = card.querySelector('.node-card');
+  
+  cardEl.setAttribute('data-node-id', nodeId);
+  card.querySelector('.node-name').textContent = node.functionalName || 'Unknown';
+  card.querySelector('.node-mac').textContent = node.macAddress || '-';
+  card.querySelector('.node-version').textContent = node.version || '-';
+  card.querySelector('.node-battery').textContent = (node.battery || 0) + '%';
+  card.querySelector('.node-signal').textContent = (node.signalStrength || 0) + ' dBm';
+  
+  const statusEl = card.querySelector('.node-status');
+  if (node.isActive) {
+    statusEl.textContent = '🟢 Online';
+    statusEl.classList.add('active');
+  } else {
+    statusEl.textContent = '🔴 Offline';
+    statusEl.classList.add('offline');
+  }
+  
+  const editBtn = card.querySelector('.btn-secondary');
+  editBtn.onclick = () => editNode(nodeId);
+  
+  const delBtn = card.querySelector('.btn-danger');
+  delBtn.onclick = () => deleteNode(nodeId);
+  
+  return card;
+}
+
+async function editNode(nodeId) {
+  currentNodeId = nodeId;
+  
+  if (nodeId) {
+    try {
+      const response = await axios.get(`/api/nodes/${nodeId}`);
+      const node = response.data;
+      
+      document.getElementById('nodeModalTitle').textContent = 'Edit Node';
+      document.getElementById('nodeName').value = node.functionalName || '';
+      document.getElementById('nodeMac').value = node.macAddress || '';
+      document.getElementById('nodeVersion').value = node.version || '';
+      document.getElementById('nodeBattery').value = node.battery || '';
+      document.getElementById('nodeSignal').value = node.signalStrength || '';
+      document.getElementById('nodeActive').checked = node.isActive || false;
+    } catch (error) {
+      console.error('Error loading node:', error);
+      alert('Failed to load node data');
+      return;
+    }
+  } else {
+    document.getElementById('nodeModalTitle').textContent = 'Add New Node';
+    document.getElementById('nodeForm').reset();
+    document.getElementById('nodeMac').value = '';
+  }
+  
+  openModal('nodeModal');
+}
+
+async function saveNode(event) {
+  event.preventDefault();
+  
+  const formData = {
+    functionalName: document.getElementById('nodeName').value,
+    version: document.getElementById('nodeVersion').value,
+    battery: parseInt(document.getElementById('nodeBattery').value) || 0,
+    signalStrength: parseInt(document.getElementById('nodeSignal').value) || 0,
+    isActive: document.getElementById('nodeActive').checked
+  };
+
+  try {
+    if (currentNodeId) {
+      // Edit existing node
+      const response = await axios.put(`/api/nodes/${currentNodeId}`, formData);
+      if (response.data.success) {
+        closeModal('nodeModal');
+        alert('✅ Node saved successfully');
+        loadNodes();
+      } else {
+        alert('Error: ' + (response.data.error || 'Unknown error'));
+      }
+    } else {
+      // Add new node
+      formData.macAddress = document.getElementById('nodeMac').value;
+      if (!formData.macAddress) {
+        alert('MAC address required for new nodes');
+        return;
+      }
+      
+      const response = await axios.post('/api/nodes', formData);
+      if (response.data.success) {
+        closeModal('nodeModal');
+        alert('✅ Node created successfully');
+        loadNodes();
+      } else {
+        alert('Error: ' + (response.data.error || 'Unknown error'));
+      }
+    }
+  } catch (error) {
+    console.error('Error saving node:', error);
+    alert('Failed to save node: ' + (error.response?.data?.error || error.message));
+  }
+}
+
+async function deleteNode(nodeId) {
+  if (!confirm('Are you sure you want to delete this node?')) return;
+  
+  try {
+    const response = await axios.delete(`/api/nodes/${nodeId}`);
+    if (response.data.success) {
+      alert('✅ Node deleted');
+      loadNodes();
+    } else {
+      alert('Error deleting node');
+    }
+  } catch (error) {
+    console.error('Error deleting node:', error);
+    alert('Failed to delete node');
+  }
+}
+
+function openModal(modalId) {
+  document.getElementById(modalId).classList.add('show');
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('show');
+}
+</script>

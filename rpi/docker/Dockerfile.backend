@@ -1,0 +1,19 @@
+# Backend Dockerfile
+# Node.js API server for MeshNet
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json ./
+RUN npm install --production
+
+# Copy actual application code
+COPY src/ ./src/
+
+# Expose API port
+EXPOSE 3001
+
+# Start application
+CMD ["node", "src/server.js"]

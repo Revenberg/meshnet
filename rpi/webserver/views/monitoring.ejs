@@ -1,0 +1,259 @@
+<div class="page-header">
+  <h2>Network Monitoring</h2>
+  <div class="time-range-selector">
+    <button class="btn btn-small" onclick="setTimeRange('1h')">1h</button>
+    <button class="btn btn-small" onclick="setTimeRange('6h')">6h</button>
+    <button class="btn btn-small active" onclick="setTimeRange('24h')">24h</button>
+    <button class="btn btn-small" onclick="setTimeRange('7d')">7d</button>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="section">
+    <h3>Network Health</h3>
+    <div class="health-metrics">
+      <div class="metric">
+        <span class="label">Average Signal Strength</span>
+        <span class="value signal-<%= avgSignal > 80 ? 'excellent' : avgSignal > 60 ? 'good' : avgSignal > 40 ? 'fair' : 'poor' %>">
+          <%= avgSignal %>%
+        </span>
+      </div>
+      <div class="metric">
+        <span class="label">Average Battery Level</span>
+        <span class="value battery-<%= avgBattery > 50 ? 'good' : 'low' %>">
+          <%= avgBattery %>%
+        </span>
+      </div>
+      <div class="metric">
+        <span class="label">Network Uptime</span>
+        <span class="value">99.7%</span>
+      </div>
+      <div class="metric">
+        <span class="label">Total Messages (24h)</span>
+        <span class="value"><%= messageCount || 0 %></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Node Status Distribution</h3>
+    <canvas id="nodeStatusChart" class="chart"></canvas>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="section">
+    <h3>Signal Strength History</h3>
+    <canvas id="signalChart" class="chart" style="height: 250px;"></canvas>
+  </div>
+
+  <div class="section">
+    <h3>Battery Level Trends</h3>
+    <canvas id="batteryChart" class="chart" style="height: 250px;"></canvas>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Top Problematic Nodes</h3>
+  <% if (problematicNodes && problematicNodes.length > 0) { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Node</th>
+          <th>Issue Type</th>
+          <th>Severity</th>
+          <th>Last Updated</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% problematicNodes.forEach(node => { %>
+          <tr>
+            <td><strong><%= node.nodeName %></strong></td>
+            <td>
+              <% 
+                const issues = [];
+                if (node.battery < 20) issues.push('Low Battery');
+                if (node.signal < 30) issues.push('Weak Signal');
+                if (!node.isActive) issues.push('Offline');
+              %>
+              <%= issues.join(', ') %>
+            </td>
+            <td>
+              <% 
+                let severity = 'info';
+                if (node.battery < 10 || node.signal < 15) severity = 'danger';
+                else if (node.battery < 20 || node.signal < 30) severity = 'warning';
+              %>
+              <span class="badge badge-<%= severity %>">
+                <%= severity.toUpperCase() %>
+              </span>
+            </td>
+            <td><small><%= new Date(node.updatedAt).toLocaleTimeString() %></small></td>
+            <td>
+              <button class="btn btn-small btn-info" onclick="inspectNode('<%= node.nodeId %>')">Inspect</button>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } else { %>
+    <div class="empty-state">
+      <p>All nodes operating normally</p>
+    </div>
+  <% } %>
+</div>
+
+<div class="section">
+  <h3>Message Activity Log</h3>
+  <div id="messageLog" class="activity-log">
+    <!-- Populated by Socket.io -->
+  </div>
+</div>
+
+<style scoped>
+.time-range-selector {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.time-range-selector .btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.health-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--color-bg-secondary);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.metric .label {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.metric .value {
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+.signal-excellent { color: #10b981; }
+.signal-good { color: #3b82f6; }
+.signal-fair { color: #f59e0b; }
+.signal-poor { color: #ef4444; }
+
+.battery-good { color: #10b981; }
+.battery-low { color: #ef4444; }
+
+.chart {
+  width: 100%;
+  max-height: 300px;
+}
+
+.activity-log {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.log-entry {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-info {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+</style>
+
+<script>
+let currentTimeRange = '24h';
+
+function setTimeRange(range) {
+  currentTimeRange = range;
+  document.querySelectorAll('.time-range-selector .btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  event.target.classList.add('active');
+  
+  console.log('📊 Loading data for ' + range);
+  // Backend integration in Phase 4
+}
+
+function inspectNode(nodeId) {
+  // Redirect to node details
+  window.location.href = '/nodes?nodeId=' + nodeId;
+}
+
+// Socket.io listener for message log
+socket.on('message-sent', (data) => {
+  const logEntry = document.createElement('div');
+  logEntry.className = 'log-entry';
+  logEntry.innerHTML = `
+    <span>${new Date().toLocaleTimeString()}</span>
+    <span>${data.nodeId || 'System'}</span>
+    <span>${data.messageType || 'unknown'}</span>
+  `;
+  
+  const messageLog = document.getElementById('messageLog');
+  messageLog.insertBefore(logEntry, messageLog.firstChild);
+  
+  // Keep only last 50 entries
+  while (messageLog.children.length > 50) {
+    messageLog.removeChild(messageLog.lastChild);
+  }
+});
+</script>

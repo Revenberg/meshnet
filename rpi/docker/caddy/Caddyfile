@@ -1,0 +1,62 @@
+# MeshNet Caddy Reverse Proxy Configuration
+# Handles DNS routing and automatic SSL
+
+{
+  # Global configuration
+  auto_https off
+  log {
+    level debug
+  }
+}
+
+# ============ MAIN DASHBOARD ============
+# Access via: http://meshnet.local or https://meshnet.local
+meshnet.local,
+*.meshnet.local,
+localhost:80 {
+  # Main dashboard
+  route /api/* {
+    reverse_proxy backend:3001
+  }
+  
+  # WebSocket support for socket.io
+  handle /socket.io/* {
+    reverse_proxy webserver:80
+  }
+  
+  # Default to webserver (dashboard)
+  reverse_proxy webserver:80
+}
+
+# ============ BACKEND API DIRECT ACCESS ============
+# Access via: http://api.meshnet.local
+api.meshnet.local,
+api.localhost:3001 {
+  reverse_proxy backend:3001
+}
+
+# ============ LORA GATEWAY ============
+# Access via: http://gateway.meshnet.local
+gateway.meshnet.local,
+gateway.localhost:3002 {
+  reverse_proxy lora-gateway:3002
+}
+
+# ============ MQTT BROKER (Optional) ============
+# MQTT over WebSockets: ws://mqtt.meshnet.local
+mqtt.meshnet.local,
+mqtt.localhost:1883 {
+  # MQTT uses TCP, not HTTP - this is for future WebSocket bridge
+  # Can use mqtt.meshnet.local:1883 directly in MQTT clients
+}
+
+# ============ HEALTH CHECK ============
+# Simple health endpoint
+/health {
+  respond "OK" 200
+}
+
+# Redirect HTTP to HTTPS (disabled for local testing)
+# http://meshnet.local {
+#   redir https://{host}{uri} permanent
+# }

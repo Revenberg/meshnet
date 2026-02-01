@@ -1,0 +1,370 @@
+#include "NodeWebServer.h"
+#include "LoraNode.h"
+#include "User.h"
+#include <Arduino.h>
+#include <WiFi.h>
+#include <DNSServer.h>
+#include <WebServer.h>
+
+// ====== Globale objecten ======
+WebServer NodeWebServer::httpServer(80);
+
+String AP_SSID = "GAME_ON";
+String AP_PASS = "";
+
+NodeMessage messages[MAX_MSGS];
+int msgWriteIndex = 0;
+
+const byte DNS_PORT = 53;
+IPAddress apIP(192, 168, 4, 1); // Statisch AP-IP
+DNSServer NodeWebServer::dnsServer;
+
+// ====== HTML pagina’s ======
+String PAGE_INDEX_NEW = R"rawliteral(
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>LoRa Node</title></head>
+  <body>
+    <h1>Welkom bij de LoRa Node</h1>
+    <a href='/register.html'>Registreren</a> | <a href='/login.html'>Login</a><br><br>
+  </body>
+</html>
+)rawliteral";
+
+String PAGE_LOGIN = R"rawliteral(
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>Login</title></head>
+  <body>
+    <h2>Login</h2>
+    <form method='POST' action='/login'>
+      <label>Gebruikersnaam:</label><br>
+      <input type='text' name='username'><br>
+      <label>Wachtwoord:</label><br>
+      <input type='password' name='password'><br><br>
+      <input type='submit' value='Login'>
+    </form>
+  </body>
+</html>
+)rawliteral";
+
+String PAGE_REGISTER = R"rawliteral(
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>Registreren</title></head>
+  <body>
+    <h2>Registreren</h2>
+    <form method='POST' action='/register'>
+      <label>Gebruikersnaam:</label><br>
+      <input type='text' name='username'><br>
+      <label>Wachtwoord:</label><br>
+      <input type='password' name='password'><br><br>
+      <input type='submit' value='Maak account'>
+    </form>
+  </body>
+</html>
+)rawliteral";
+
+String PAGE_DEBUG = R"rawliteral(
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>Debug</title></head>
+  <body>
+    <h2>Debug Info</h2>
+    <pre>%DEBUG_INFO%</pre>
+  </body>
+</html>
+)rawliteral";
+
+const char PAGE_INDEX[] PROGMEM = R"rawliteral( <!DOCTYPE html><html> <head> <meta charset='UTF-8'> <meta name='viewport' content='width=device-width, initial-scale=1'> <style> body { font-family: Arial; margin: 20px; } input[type=text], input[type=password]{ width: 80%%; padding: 8px; } input[type=submit]{ padding: 8px 16px; } div.box{ margin-top:20px; padding:10px; border:1px solid #333; border-radius:8px;} </style> </head> <body> <h2>Heltec ESP32 Webserver %USERNAME%</h2> <form action='/' method='POST'> <input type='text' name='msg' placeholder='Typ bericht...'> <input type='submit' value='Verzend'> </form> <a href='http://%AP_IP%/register.html'>Registreren</a> | <a href='http://%AP_IP%/login.html'>Login</a><br><br> %ONLINE_NODES% </body> </html> )rawliteral";
+
+// ====== Handlers ======
+void NodeWebServer::handleRoot()
+{
+    String session = "";
+    String cookies = httpServer.header("Cookie");
+    Serial.println("[INFO] Cookies: " + cookies);
+    if (cookies.indexOf("session=") >= 0) {
+        int start = cookies.indexOf("session=") + 8;
+        int end = cookies.indexOf(";", start);
+        if (end == -1) end = cookies.length();
+        session = cookies.substring(start, end);
+        Serial.println(cookies);
+        Serial.println("[INFO] Geldige sessie gevonden: " + session);
+    }
+
+    if (session == "")
+    {
+        Serial.println("[INFO] Geen geldige sessie gevonden.");
+        NodeWebServer::httpServer.send(200, "text/html", PAGE_INDEX_NEW);
+    }
+    else
+    {
+        Serial.println("[INFO] Geldige sessie gevonden: " + session);
+        String page = makePage();
+        httpServer.send(200, "text/html; charset=UTF-8", page);
+    }
+}
+
+void NodeWebServer::handlePost()
+{
+    NodeWebServer::httpServer.send(405, "text/plain", "POST not supported here.");
+}
+
+void NodeWebServer::handleLoginPage()
+{
+    NodeWebServer::httpServer.send(200, "text/html", PAGE_LOGIN);
+}
+
+void NodeWebServer::handleRegisterPage()
+{
+    NodeWebServer::httpServer.send(200, "text/html", PAGE_REGISTER);
+}
+
+void NodeWebServer::handleRegister()
+{
+    String username = NodeWebServer::httpServer.arg("username");
+    String password = NodeWebServer::httpServer.arg("password");
+
+    Serial.println("[INFO] Registratie poging: " + username);
+    Serial.println("[INFO]: " + password);
+
+    if (username.length() > 0 && password.length() > 0)
+    {
+        String token = "";
+        User::addOrUpdateUser(username, User::hashPassword(password), token);
+        NodeWebServer::httpServer.send(200, "text/html", "<p>Registratie gelukt!</p><a href='/login.html'>Ga naar login</a>");
+    }
+    else
+    {
+        NodeWebServer::httpServer.send(400, "text/html", "<p>Fout: incomplete gegevens.</p>");
+    }
+}
+
+void NodeWebServer::handleLogin()
+{
+    String username = NodeWebServer::httpServer.arg("username");
+    String password = NodeWebServer::httpServer.arg("password");
+
+    Serial.println("[INFO] Registratie poging: " + username);
+    Serial.println("[INFO]: " + password);
+
+    if (User::isValidPassword(username, User::hashPassword(password)))
+    {
+        Serial.println("[INFO] Geldige inloggegevens voor gebruiker: " + username);
+
+        String session = User::getTokenByUsername(username);
+
+        Serial.println("[INFO] Nieuwe sessie aangemaakt: " + session);
+
+        httpServer.sendHeader("Set-Cookie", "session=" + session + "; Max-Age=36000; Path=/");
+        httpServer.sendHeader("Location", "/makePage.html");
+        httpServer.send(303);
+        /*
+
+        NodeWebServer::httpServer.send(200, "text/html",
+                                       "<p>Welkom, " + username + "!</p>"
+                                                                  "<a href='/msg?token=" +
+                                           token + "'>Berichten</a><br>"
+                                                   "<a href='/logout'>Logout</a>");
+    */
+    }
+    else
+    {
+        NodeWebServer::httpServer.send(403, "text/html", "<p>Login mislukt. <a href='/login.html'>Probeer opnieuw</a></p>");
+    }
+}
+
+void NodeWebServer::handleLogout()
+{
+    NodeWebServer::httpServer.send(200, "text/html", "<p>Je bent uitgelogd.</p><a href='/'>Home</a>");
+}
+
+static String escapeHtml(const String &input)
+{
+    String out = input;
+    out.replace("&", "&amp;");
+    out.replace("<", "&lt;");
+    out.replace(">", "&gt;");
+    out.replace("\"", "&quot;");
+    out.replace("'", "&#39;");
+    return out;
+}
+
+String NodeWebServer::makePage()
+{
+    String page(PAGE_INDEX); // Token doorgeven (uit querystring)
+
+    String session = "";
+    String cookies = httpServer.header("Cookie");
+    Serial.println("[INFO] Cookies: " + cookies);
+    if (cookies.indexOf("session=") >= 0) {
+        int start = cookies.indexOf("session=") + 8;
+        int end = cookies.indexOf(";", start);
+        if (end == -1) end = cookies.length();
+        session = cookies.substring(start, end);
+    }
+
+    if (session == "")
+    {
+        Serial.println("[INFO] Geen geldige sessie gevonden.");
+    }
+    else
+    {
+        Serial.println("[INFO] Geldige sessie gevonden: " + session);
+    }
+
+    if (session.length() == 0)
+    {
+        Serial.println("[INFO] Geen token aanwezig in query");
+    }
+    else
+    {
+        Serial.println("[INFO] Token gevonden in query: " + session);
+        if (User::isValidToken(session))
+        {
+            String user = User::getNameByToken(session);
+            Serial.println("[INFO] Ingelogd als gebruiker: " + user);
+        }
+        else
+        {
+            Serial.println("[WARN] Ongeldig token: " + session);
+            NodeWebServer::httpServer.sendHeader("Set-Cookie", "session=; HttpOnly");
+        }
+    }
+    // Links
+    String links = "<div class='box'><h3>Webserver Links</h3><ul>";
+    links += "<li><a href='/'>Home</a></li>";
+    links += "<li><a href='/register.html'>Register</a></li>";
+    links += "<li><a href='/debug.html'>Debug</a></li>";
+    links += "<li><a href='/msg'>Send Message (POST)</a></li>";
+    links += "<li><a href='/generate_204.html'>Captive Portal</a></li>";
+    links += "<li><a href='/fwlink.html'>FWLink</a></li>";
+    links += "<li><a href='/hotspot-detect.html'>Hotspot Detect</a></li>";
+    if (session.length() > 0)
+    {
+        links += "<li><a href='/logout'>Logout</a></li>";
+    }
+    else
+    {
+        links += "<li><a href='/login.html'>Login</a></li>";
+    }
+    links += "</ul></div>";
+    // Online nodes lijst
+    String nodeList = "<h3>Online Nodes</h3><ul>";
+    int onlineCount = LoraNode::getOnlineCount();
+    const OnlineNode *onlineNodes = LoraNode::getOnlineNodes();
+    Serial.println("[INFO] Online nodes:" + String(onlineCount));
+    nodeList += "<li>Online nodes: " + String(onlineCount) + "</li>";
+    for (int i = 0; i < onlineCount; i++)
+    {
+        unsigned long now = millis();
+        unsigned long lastSeen = onlineNodes[i].lastSeen;
+        unsigned long secondsAgo = (now > lastSeen) ? (now - lastSeen) / 1000 : 0;
+        nodeList += "<li>" + escapeHtml(onlineNodes[i].name) + " (RSSI: " + String(onlineNodes[i].rssi) + " dBm, SNR: " + String(onlineNodes[i].snr) + " dB, last seen: " + String(secondsAgo) + "s ago)</li>";
+    }
+    nodeList += "</ul>";
+    // Gebruikerslijst toevoegen
+    String userList = "<h3>Alle gebruikers</h3><ul>";
+    int userCount = User::getUserCount();
+    for (int i = 0; i < userCount; i++)
+    {
+        userList += "<li>" + escapeHtml(User::getUserName(i)) + "</li>";
+    }
+    userList += "</ul>";
+    // IP en token injecteren
+    IPAddress ip = WiFi.softAPIP();
+    String ipStr = ip.toString();
+    page.replace("%AP_IP%", ipStr);
+    // Voeg hidden field met token toe
+    //String tokenField = "";
+    String username = "";
+    if (session.length() > 0)
+    {
+        if (User::isValidToken(session))
+        {
+            username = User::getNameByToken(session);
+        }
+    }
+    page.replace("%USERNAME%", username);
+    // Zoek formulier en voeg hidden token toe
+    page.replace("<input type='submit' value='Verzend'>", "<input type='hidden' name='token' value='" + session + "'><input type='submit' value='Verzend'>");
+    page.replace("%ONLINE_NODES%", links + nodeList + userList);
+    return page;
+}
+
+void NodeWebServer::handleMsg()
+{
+    String token = NodeWebServer::httpServer.arg("token");
+    String content = "<h2>Berichten</h2><form method='POST' action='/msg?token=" + token + "'>"
+                                                                                           "Bericht: <input type='text' name='msg'><br>"
+                                                                                           "<input type='submit' value='Stuur'></form><br>";
+
+    for (int i = 0; i < MAX_MSGS; i++)
+    {
+        if (messages[i].text.length() > 0)
+        {
+            content += "<b>" + messages[i].user + ":</b> " + messages[i].text + "<br>";
+        }
+    }
+
+    NodeWebServer::httpServer.send(200, "text/html", content);
+}
+
+void NodeWebServer::handleDebugPage()
+{
+    NodeMessage nodeMessage;
+    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Debug</title></head><body>";
+    html += "<h2>Stored Messages (Ringbuffer)</h2>";
+    html += "<table border='1' cellpadding='5' cellspacing='0'>";
+    html += "<tr><th>ID</th><th>User</th><th>Text</th><th>TTL</th></tr>";
+    int index = LoraNode::getMsgCount() - LoraNode::getMsgWriteIndex();
+    if (index < 0)
+        index += MAX_MSGS;
+    for (int i = 0; i < LoraNode::getMsgCount(); i++)
+    {
+        int idx = (index + i) % MAX_MSGS;
+        // NodeMessage
+        nodeMessage = LoraNode::getMessage(idx);
+        html += "<tr>";
+        html += LoraNode::getMessageRow(idx);
+        html += "</tr>";
+    }
+    html += "</table><br>";
+    html += "</body></html>";
+    httpServer.send(200, "text/html; charset=UTF-8", html);
+}
+
+// ====== Setup & loop ======
+void NodeWebServer::webserverSetup()
+{
+    Serial.println("[INFO] Start Webserver...");
+
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID.c_str(), AP_PASS.c_str());
+
+    httpServer.on("/", HTTP_GET, handleRoot);
+    httpServer.on("/", HTTP_POST, handlePost);
+
+    httpServer.on("/makePage.html", HTTP_GET, makePage);
+
+    httpServer.onNotFound(handleRoot);
+    httpServer.on("/msg", HTTP_POST, handleMsg);
+    httpServer.on("/debug.html", HTTP_GET, handleDebugPage);
+    httpServer.on("/register.html", HTTP_GET, handleRegisterPage);
+    httpServer.on("/register", HTTP_POST, handleRegister);
+    httpServer.on("/login.html", HTTP_GET, handleLoginPage);
+    httpServer.on("/login", HTTP_POST, handleLogin);
+    httpServer.on("/logout", HTTP_GET, handleLogout); // ✅ GET ipv POST
+
+    NodeWebServer::httpServer.begin();
+    Serial.println("[INFO] Webserver gestart.");
+
+    dnsServer.start(DNS_PORT, "*", apIP);
+}
+
+void NodeWebServer::webserverLoop()
+{
+    dnsServer.processNextRequest();
+    httpServer.handleClient();
+}

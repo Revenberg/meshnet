@@ -1,0 +1,21 @@
+{
+  "name": "lora-gateway",
+  "version": "1.0.0",
+  "description": "LoRa Gateway Bridge - Connects Docker backend to LoRa mesh network",
+  "main": "lora-gateway.js",
+  "scripts": {
+    "start": "node lora-gateway.js",
+    "dev": "nodemon lora-gateway.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.0.0",
+    "axios": "^1.4.0",
+    "serialport": "^11.0.0",
+    "@serialport/parser-readline": "^11.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "author": "MeshNet Project",
+  "license": "MIT"
+}

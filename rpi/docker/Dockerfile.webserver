@@ -1,0 +1,26 @@
+# Webserver Dockerfile
+# Express.js dashboard server for MeshNet
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json ./
+RUN npm install --production
+
+# Copy application code
+COPY server.js ./
+
+# Copy views and public directories
+COPY views ./views/
+COPY public ./public/
+
+# Verify views are present
+RUN ls -la /app/views/ || echo "Warning: views directory not found"
+
+# Expose HTTP port
+EXPOSE 80
+
+# Start application
+CMD ["node", "server.js"]

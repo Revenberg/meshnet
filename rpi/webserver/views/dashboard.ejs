@@ -1,0 +1,216 @@
+<div class="dashboard-header">
+  <h2>Welcome to MeshNet</h2>
+  <p>Distributed LoRa mesh network management system</p>
+</div>
+
+<div class="dashboard-grid">
+  <!-- Stats Cards -->
+  <div class="stats-container">
+    <div class="stat-card">
+      <div class="stat-icon">📡</div>
+      <div class="stat-content">
+        <h3><%= nodes ? nodes.length : 0 %></h3>
+        <p>Active Nodes</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-content">
+        <h3><%= groups ? groups.length : 0 %></h3>
+        <p>Groups</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">🔗</div>
+      <div class="stat-content">
+        <h3 id="connection-count">0</h3>
+        <p>Connections</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">⚡</div>
+      <div class="stat-content">
+        <h3 id="health-status">Good</h3>
+        <p>Network Health</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nodes Table -->
+  <div class="section">
+    <h3>Active Nodes</h3>
+    <% if (nodes && nodes.length > 0) { %>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Node ID</th>
+            <th>MAC Address</th>
+            <th>Name</th>
+            <th>Battery %</th>
+            <th>Signal (RSSI)</th>
+            <th>Last Seen</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="nodes-tbody">
+          <% nodes.forEach(node => { %>
+            <tr class="node-row" data-node-id="<%= node.nodeId %>">
+              <td><code><%= node.nodeId.substring(0, 12) %>...</code></td>
+              <td><code><%= node.macAddress %></code></td>
+              <td><%= node.functionalName || 'Unnamed' %></td>
+              <td><span class="battery-indicator" data-battery="<%= node.battery || 0 %>"><%= node.battery || '-' %>%</span></td>
+              <td><%= node.signalStrength || '-' %> dBm</td>
+              <td><time datetime="<%= node.lastSeen %>"><%= node.lastSeen ? new Date(node.lastSeen).toLocaleString() : 'Never' %></time></td>
+              <td><span class="status-badge status-<%= node.isActive ? 'active' : 'inactive' %>"><%= node.isActive ? 'Active' : 'Offline' %></span></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <div class="empty-state">
+        <p>No active nodes connected yet</p>
+        <small>Nodes will appear here when they connect to the network</small>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Network Topology -->
+  <div class="section">
+    <h3>Network Topology</h3>
+    <canvas id="network-canvas" width="600" height="400"></canvas>
+    <p class="text-muted">Live network visualization</p>
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="section">
+    <h3>Recent Activity</h3>
+    <div id="activity-log" class="activity-log">
+      <p class="text-muted">Waiting for network activity...</p>
+    </div>
+  </div>
+</div>
+
+<style scoped>
+.dashboard-header {
+  margin-bottom: 2rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+}
+
+.dashboard-header h2 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+}
+
+.stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  gap: 1rem;
+}
+
+.stat-icon {
+  font-size: 2rem;
+}
+
+.stat-content h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.stat-content p {
+  margin: 0.25rem 0 0;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.battery-indicator {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.battery-indicator[data-battery="100"],
+.battery-indicator[data-battery^="9"] {
+  background: #d4edda;
+  color: #155724;
+}
+
+.battery-indicator[data-battery^="5"],
+.battery-indicator[data-battery^="6"],
+.battery-indicator[data-battery^="7"],
+.battery-indicator[data-battery^="8"] {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.battery-indicator[data-battery^="[0-4]"] {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.status-active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-inactive {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+#network-canvas {
+  width: 100%;
+  max-width: 600px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #f9f9f9;
+}
+
+.activity-log {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.activity-log-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 0.9rem;
+}
+
+.activity-log-item:last-child {
+  border-bottom: none;
+}
+
+.activity-time {
+  color: #999;
+  font-size: 0.85rem;
+}
+</style>

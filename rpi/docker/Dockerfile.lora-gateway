@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install system deps for serial port enumeration
+RUN apk add --no-cache eudev
+
+# Copy package files
+COPY package.json ./
+
+# Install dependencies
+RUN npm install --production
+
+# Copy application code
+COPY index.js ./
+COPY serialConfig.js ./
+
+# Expose port
+EXPOSE 3002
+
+# Start application
+CMD ["npm", "start"]
