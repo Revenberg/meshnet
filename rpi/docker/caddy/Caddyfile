@@ -30,22 +30,19 @@ localhost:80 {
 
 # ============ BACKEND API DIRECT ACCESS ============
 # Access via: http://api.meshnet.local
-api.meshnet.local,
-api.localhost:3001 {
+api.meshnet.local {
   reverse_proxy localhost:3001
 }
 
 # ============ LORA GATEWAY ============
 # Access via: http://gateway.meshnet.local
-gateway.meshnet.local,
-gateway.localhost:3002 {
+gateway.meshnet.local {
   reverse_proxy localhost:3002
 }
 
 # ============ MQTT BROKER (Optional) ============
 # MQTT over WebSockets: ws://mqtt.meshnet.local
-mqtt.meshnet.local,
-mqtt.localhost:1883 {
+mqtt.meshnet.local {
   # MQTT uses TCP, not HTTP - this is for future WebSocket bridge
   # Can use mqtt.meshnet.local:1883 directly in MQTT clients
 }
