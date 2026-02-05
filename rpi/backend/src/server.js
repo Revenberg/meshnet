@@ -311,6 +311,9 @@ async function ensureDatabaseSchema() {
       signalStrength INT,
       battery INT,
       connectedNodes INT DEFAULT 0,
+      loadedUsersCount INT DEFAULT 0,
+      loadedPagesCount INT DEFAULT 0,
+      statsUpdatedAt TIMESTAMP NULL,
       isActive BOOLEAN DEFAULT TRUE,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -318,6 +321,32 @@ async function ensureDatabaseSchema() {
       INDEX idx_isActive (isActive)
     )`
   );
+
+  const nodeColumnUpgrades = [
+    {
+      name: 'loadedUsersCount',
+      sql: 'ALTER TABLE nodes ADD COLUMN loadedUsersCount INT DEFAULT 0'
+    },
+    {
+      name: 'loadedPagesCount',
+      sql: 'ALTER TABLE nodes ADD COLUMN loadedPagesCount INT DEFAULT 0'
+    },
+    {
+      name: 'statsUpdatedAt',
+      sql: 'ALTER TABLE nodes ADD COLUMN statsUpdatedAt TIMESTAMP NULL'
+    }
+  ];
+
+  for (const upgrade of nodeColumnUpgrades) {
+    try {
+      await dbPool.query(upgrade.sql);
+      console.log(`✓ Added nodes.${upgrade.name}`);
+    } catch (error) {
+      if (!String(error.message || '').toLowerCase().includes('duplicate column')) {
+        console.warn(`⚠ Could not add nodes.${upgrade.name}:`, error.message);
+      }
+    }
+  }
 
   await dbPool.query(
     `INSERT IGNORE INTO \`groups\` (groupId, name, description, permissions)
@@ -770,6 +799,37 @@ app.post('/api/nodes/:nodeId/update', async (req, res) => {
     ]);
     
     res.json({ success: true, status: 'updated' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update node stats (users/pages counts)
+app.post('/api/nodes/:nodeId/stats', async (req, res) => {
+  try {
+    if (!dbPool) return res.json({ success: true, warning: 'Database not available' });
+    const { loadedUsersCount, loadedPagesCount } = req.body || {};
+    await dbPool.query(
+      'UPDATE nodes SET loadedUsersCount = COALESCE(?, loadedUsersCount), loadedPagesCount = COALESCE(?, loadedPagesCount), statsUpdatedAt = NOW() WHERE nodeId = ?',
+      [
+        loadedUsersCount !== undefined ? Number(loadedUsersCount) : null,
+        loadedPagesCount !== undefined ? Number(loadedPagesCount) : null,
+        req.params.nodeId
+      ]
+    );
+    res.json({ success: true, status: 'stats-updated' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Request node stats via LoRa gateway
+app.post('/api/nodes/:nodeId/stats/request', async (req, res) => {
+  try {
+    const loraGatewayUrl = process.env.LORA_GATEWAY_URL || 'http://127.0.0.1:3002';
+    const packet = `LORA_TX;REQ;STATS;${req.params.nodeId}`;
+    await axios.post(`${loraGatewayUrl}/relay/packet`, { packet }, { timeout: 5000 });
+    res.json({ success: true, status: 'stats-requested' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

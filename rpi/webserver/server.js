@@ -484,6 +484,26 @@ app.put('/api/nodes/:nodeId', async (req, res) => {
   }
 });
 
+// Request node stats (users/pages) via LoRa
+app.post('/api/nodes/:nodeId/stats/request', async (req, res) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/nodes/${req.params.nodeId}/stats/request`);
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update node stats (users/pages)
+app.post('/api/nodes/:nodeId/stats', async (req, res) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/nodes/${req.params.nodeId}/stats`, req.body || {});
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete node
 app.delete('/api/nodes/:nodeId', async (req, res) => {
   try {

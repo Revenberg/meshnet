@@ -186,6 +186,11 @@ async function handleLoRaMessage(data) {
       return;
     }
 
+    if (message.startsWith('RESP;STATS;')) {
+      await handleStatsResponse(message);
+      return;
+    }
+
     if (message.includes('BEACON;')) {
       await handleBeacon(message);
       return;
@@ -401,6 +406,25 @@ function handleNodeStatus(message) {
 
 function handleMetrics(message) {
   console.log(`[METRICS] ${message}`);
+}
+
+async function handleStatsResponse(message) {
+  const parts = message.split(';');
+  if (parts.length < 5) return;
+  const nodeId = parts[2];
+  const loadedUsersCount = Number(parts[3]);
+  const loadedPagesCount = Number(parts[4]);
+  if (!nodeId) return;
+
+  try {
+    await axios.post(`${BACKEND_URL}/api/nodes/${nodeId}/stats`, {
+      loadedUsersCount: Number.isFinite(loadedUsersCount) ? loadedUsersCount : 0,
+      loadedPagesCount: Number.isFinite(loadedPagesCount) ? loadedPagesCount : 0
+    });
+    console.log(`[STATS] Updated ${nodeId}: users=${loadedUsersCount} pages=${loadedPagesCount}`);
+  } catch (error) {
+    console.error(`[STATS] Failed to update ${nodeId}:`, error.message);
+  }
 }
 
 async function handleBeacon(message) {

@@ -72,6 +72,9 @@
           <th>Battery</th>
           <th>Signal</th>
           <th>Connected To</th>
+          <th>Users Loaded</th>
+          <th>Pages Loaded</th>
+          <th>Stats Updated</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
@@ -90,12 +93,18 @@
             </td>
             <td><%= node.signalStrength || '-' %> dBm</td>
             <td><%= node.connectedNodes || 0 %> nodes</td>
+            <td><%= (node.loadedUsersCount !== null && node.loadedUsersCount !== undefined) ? node.loadedUsersCount : '-' %></td>
+            <td><%= (node.loadedPagesCount !== null && node.loadedPagesCount !== undefined) ? node.loadedPagesCount : '-' %></td>
+            <td>
+              <%= node.statsUpdatedAt ? new Date(node.statsUpdatedAt).toLocaleString() : '-' %>
+            </td>
             <td>
               <span class="status-badge status-<%= isNodeOnline(node) ? 'active' : 'inactive' %>">
                 <%= isNodeOnline(node) ? 'Online' : 'Offline' %>
               </span>
             </td>
             <td>
+              <button class="btn btn-small btn-secondary" onclick="requestNodeStats('<%= node.nodeId %>', this)">Fetch Stats</button>
               <button class="btn btn-small btn-primary" onclick="editNode('<%= node.nodeId %>')">Edit</button>
               <button class="btn btn-small btn-danger" onclick="deleteNode('<%= node.nodeId %>')">Delete</button>
             </td>
@@ -274,6 +283,30 @@ async function deleteNode(nodeId) {
     } catch (error) {
       console.error('Error deleting node:', error);
       alert('Failed to delete node');
+    }
+  }
+}
+
+async function requestNodeStats(nodeId, buttonEl) {
+  try {
+    if (buttonEl) {
+      buttonEl.disabled = true;
+      buttonEl.textContent = 'Requesting...';
+    }
+    await axios.post(`/api/nodes/${nodeId}/stats/request`);
+    if (buttonEl) {
+      buttonEl.textContent = 'Requested';
+      setTimeout(() => {
+        buttonEl.disabled = false;
+        buttonEl.textContent = 'Fetch Stats';
+      }, 3000);
+    }
+  } catch (error) {
+    console.error('Error requesting stats:', error);
+    alert('Failed to request stats');
+    if (buttonEl) {
+      buttonEl.disabled = false;
+      buttonEl.textContent = 'Fetch Stats';
     }
   }
 }

@@ -28,3 +28,20 @@
 
 ## Test Playbook
 Zie [TEST_PLAYBOOK.md](TEST_PLAYBOOK.md) voor zelf-uitvoerbare stappen, verwachte uitkomsten en herstelacties.
+
+## TODO / Taken
+- Implementeer nieuwe Heltec AP flows (home/login/admin).
+- Maak nieuwe firmware release: **1.8.0**.
+- Deploy op alle Heltec devices.
+- Update testscripts:
+	- Maak **10 teams** via API endpoints.
+	- Maak per team **3–8 users** via API endpoints.
+	- Maak **10 virtuele Heltec nodes** (alleen in database).
+	- Maak pagina’s voor alle groepen/nodes.
+	- Test dat echte Heltec devices **alleen eigen pagina’s** en **alle users** ontvangen.
+- Voeg in Docker web UI bij node-overzicht **geladen users/pages** toe.
+	- Pas webserver UI aan.
+	- Pas database + API endpoint aan.
+	- Pas gateway aan.
+	- Pas Heltec (LoRa) functionaliteit aan.
+	- Stats ophalen via **on-demand request** (knop per node) om data verzoeken te beperken.

@@ -14,6 +14,7 @@ public:
     static void setupLogin();
     static void setupRegister();
     static void setupLogout();
+    static void setupAdmin();
     static void setupDebug();
     static void setupMessages();
     static void setupCaptivePortal();
@@ -29,6 +30,7 @@ public:
     static String getTeamPageUpdatedAt(const String &team);
     static bool hasTeamPage(const String &team);
     static int getStoredPagesCount();
+    static int getMaxTeamPages();
     static String getTeamNameAt(int index);
     static String getTeamUpdatedAtAt(int index);
     static int getTeamPageLengthAt(int index);
@@ -39,7 +41,7 @@ private:
     static DNSServer dnsServer;
     static bool usersSynced;
     static bool pagesSynced;
-    static const int MAX_TEAM_PAGES = 10;
+    static const int MAX_TEAM_PAGES = 20;
     static String teamNames[MAX_TEAM_PAGES];
     static String teamPages[MAX_TEAM_PAGES];
     static String teamPageUpdatedAt[MAX_TEAM_PAGES];

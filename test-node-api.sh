@@ -11,6 +11,7 @@ NODE_2="26b80c3a-a7e2-4634-957a-51f7b777de72"
 NODE_3="d1ec1f02-0e0b-4763-94d5-984e93c11bde"
 
 API_BASE="http://localhost:3001/api/host"
+API_CORE="http://localhost:3001/api"
 
 # Color output
 RED='\033[0;31m'
@@ -43,6 +44,58 @@ run_test() {
     fail_count=$((fail_count + 1))
   fi
 }
+
+post_json() {
+  local url=$1
+  local body=$2
+  curl -s -X POST -H "Content-Type: application/json" -d "$body" "$url" >/dev/null
+}
+
+get_json() {
+  local url=$1
+  curl -s "$url"
+}
+
+echo "Setup: Create 10 teams, users, virtual nodes, and pages"
+echo ""
+
+TEAM_NAMES=()
+for i in $(seq -w 1 10); do
+  TEAM_NAMES+=("Team ${i}")
+done
+
+for team in "${TEAM_NAMES[@]}"; do
+  post_json "$API_CORE/groups" "{\"name\":\"$team\",\"description\":\"Auto test team $team\",\"permissions\":[]}" || true
+  echo "  ✓ Team ensured: $team"
+done
+
+GROUPS_JSON=$(get_json "$API_CORE/groups")
+TOTAL_NEW_USERS=0
+
+for team in "${TEAM_NAMES[@]}"; do
+  GROUP_ID=$(echo "$GROUPS_JSON" | grep -o "{[^}]*\"name\":\"$team\"[^}]*}" | grep -o '"id"[[:space:]]*:[[:space:]]*[0-9]*' | head -1 | grep -o '[0-9]*')
+  if [ -z "$GROUP_ID" ]; then
+    continue
+  fi
+  COUNT=$(( (RANDOM % 6) + 3 ))
+  for i in $(seq -w 1 $COUNT); do
+    USERNAME=$(echo "${team}" | tr -d ' ' | tr '[:upper:]' '[:lower:]')_user${i}
+    post_json "$API_CORE/users" "{\"username\":\"$USERNAME\",\"password\":\"test123\",\"groupId\":$GROUP_ID}" || true
+    TOTAL_NEW_USERS=$((TOTAL_NEW_USERS + 1))
+    echo "  ✓ User ensured: $USERNAME"
+  done
+done
+
+for i in $(seq -w 1 10); do
+  NODE_ID="VIRTUAL_NODE_${i}"
+  MAC="00:00:00:00:10:$i"
+  post_json "$API_CORE/nodes" "{\"nodeId\":\"$NODE_ID\",\"macAddress\":\"$MAC\",\"functionalName\":\"Virtual Node $i\",\"version\":\"virtual\"}" || true
+  echo "  ✓ Virtual node ensured: $NODE_ID"
+done
+
+post_json "$API_CORE/pages/ensure-defaults" "{}" || true
+echo "  ✓ Default pages ensured"
+echo ""
 
 echo "📋 Test: Get Pages for Node 1"
 run_test "List pages for MeshNode-1" \
@@ -93,6 +146,30 @@ echo "❌ Test: Error Cases"
 run_test "Invalid node ID (404)" \
   "$API_BASE/node/invalid-node/pages" \
   "200"  # Returns empty array, not 404
+echo ""
+
+echo "🔎 Test: Real device sync scope"
+NODES_JSON=$(get_json "$API_CORE/nodes")
+GROUPS_COUNT=$(echo "$GROUPS_JSON" | grep -o '"id"' | wc -l | tr -d ' ')
+
+REAL_NODE_IDS=$(echo "$NODES_JSON" | grep -o '"nodeId"[[:space:]]*:[[:space:]]*"LoRA_[^"]*"' | cut -d '"' -f4)
+for nodeId in $REAL_NODE_IDS; do
+  PAGES_JSON=$(get_json "$API_CORE/sync/pages?nodeId=$nodeId")
+  PAGE_COUNT=$(echo "$PAGES_JSON" | grep -o '"page_count"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*')
+  echo "  Node $nodeId: pages=$PAGE_COUNT"
+  if [ -n "$PAGE_COUNT" ] && [ "$PAGE_COUNT" -gt "$GROUPS_COUNT" ]; then
+    echo -e "  ${RED}✗ Node has more pages than groups${NC}"
+    fail_count=$((fail_count + 1))
+  fi
+done
+
+USERS_SYNC=$(get_json "$API_CORE/sync/users")
+USER_COUNT=$(echo "$USERS_SYNC" | grep -o '"user_count"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*')
+echo "  Users synced: $USER_COUNT (new users added: $TOTAL_NEW_USERS)"
+if [ -n "$USER_COUNT" ] && [ "$USER_COUNT" -lt "$TOTAL_NEW_USERS" ]; then
+  echo -e "  ${RED}✗ Sync users count smaller than expected${NC}"
+  fail_count=$((fail_count + 1))
+fi
 echo ""
 
 echo ""

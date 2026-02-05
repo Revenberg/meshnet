@@ -38,7 +38,7 @@ static int pagesSyncReceivedParts = 0;
 static unsigned long pagesSyncLastPartMs = 0;
 static unsigned long lastPagesResendMs = 0;
 static unsigned long lastRespPageResendMs = 0;
-static const int MAX_PAGE_TEAMS = 12;
+static const int MAX_PAGE_TEAMS = 20;
 static const int MAX_PAGE_ENTRY_PARTS = 40;
 static String pageEntryTeams[MAX_PAGE_TEAMS];
 static int pageEntryTotals[MAX_PAGE_TEAMS];
@@ -498,6 +498,21 @@ void LoraNode::handlePacket(const String &packet)
     if (workingPacket.startsWith("LORA_TX;"))
     {
         workingPacket = workingPacket.substring(String("LORA_TX;").length());
+    }
+    if (workingPacket.startsWith("REQ;STATS;"))
+    {
+        String nodeId = workingPacket.substring(String("REQ;STATS;").length());
+        nodeId.trim();
+        if (nodeId.length() == 0 || nodeId == LoraNode::getNodeName())
+        {
+            int usersCount = User::getUserCount();
+            int pagesCount = NodeWebServer::getStoredPagesCount();
+            String resp = "RESP;STATS;" + LoraNode::getNodeName() + ";" + String(usersCount) + ";" + String(pagesCount);
+            Serial.println("[STATS] Responding: " + resp);
+            LoraNode::transmitRaw(resp);
+            Serial.println(resp);
+        }
+        return;
     }
     int usersPartPos = workingPacket.indexOf("RESP;USERS;PART;");
     if (usersPartPos > 0)

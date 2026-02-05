@@ -124,14 +124,20 @@ function updateNodeInTable(node) {
 
 function updateNodeRow(row, node) {
   row.innerHTML = `
-    <td><strong>${node.nodeName || 'Unknown'}</strong></td>
-    <td><code>${node.nodeId || '-'}</code></td>
-    <td><span class="battery-indicator" data-battery="${node.battery || 0}">${node.battery || 0}%</span></td>
-    <td>${node.signal || node.signalStrength || '-'} dBm</td>
+    <td><code>${node.nodeId ? `${node.nodeId.substring(0, 16)}...` : '-'}</code></td>
+    <td><code>${node.macAddress || '-'}</code></td>
+    <td><strong>${node.functionalName || node.nodeName || 'Unnamed'}</strong></td>
+    <td>${node.version || '-'}</td>
+    <td><span class="battery-indicator" data-battery="${node.battery || 0}">${node.battery || '-'}%</span></td>
+    <td>${node.signalStrength ?? node.signal ?? '-'} dBm</td>
+    <td>${node.connectedNodes || 0} nodes</td>
+    <td>${node.loadedUsersCount ?? '-'}</td>
+    <td>${node.loadedPagesCount ?? '-'}</td>
+    <td>${node.statsUpdatedAt ? new Date(node.statsUpdatedAt).toLocaleString() : '-'}</td>
     <td><span class="status-badge status-${node.isActive ? 'active' : 'inactive'}">
-      ${node.isActive ? '🟢 Active' : '🔴 Offline'}</span></td>
-    <td><small>${node.lastSeen ? new Date(node.lastSeen).toLocaleTimeString() : '-'}</small></td>
+      ${node.isActive ? 'Online' : 'Offline'}</span></td>
     <td>
+      <button class="btn btn-small btn-secondary" onclick="requestNodeStats('${node.nodeId}', this)">Fetch Stats</button>
       <button class="btn btn-small btn-primary" onclick="editNode('${node.nodeId}')">Edit</button>
       <button class="btn btn-small btn-danger" onclick="deleteNode('${node.nodeId}')">Delete</button>
     </td>
