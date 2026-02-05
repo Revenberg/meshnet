@@ -45,7 +45,11 @@
 
         <div class="page-header">
             <h2>Page Management</h2>
-            <button class="btn btn-primary" onclick="openAddPageModal()">+ Add Page</button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" onclick="syncPages()">🔁 Sync Pages</button>
+                <button class="btn btn-outline-secondary" onclick="ensureDefaultPages()">🔄 Add Missing Pages</button>
+                <button class="btn btn-primary" onclick="openAddPageModal()">+ Add Page</button>
+            </div>
         </div>
 
         <div class="section">
@@ -193,6 +197,28 @@
             document.querySelector('#pageModal .modal-title').textContent = 'Add Page';
             document.querySelector('#pageModal .btn-primary').textContent = 'Create Page';
             pageModal.show();
+        }
+
+        async function ensureDefaultPages() {
+            try {
+                const response = await axios.post('/api/pages/ensure-defaults');
+                const created = response?.data?.created ?? 0;
+                alert(`Missing pages created: ${created}`);
+                window.location.reload();
+            } catch (error) {
+                console.error('Failed to ensure default pages:', error);
+                alert('Failed to add missing pages.');
+            }
+        }
+
+        async function syncPages() {
+            try {
+                await axios.post('/api/sync/push/pages');
+                alert('Pages sync pushed to Heltec nodes.');
+            } catch (error) {
+                console.error('Failed to sync pages:', error);
+                alert('Failed to sync pages.');
+            }
         }
 
         function editPage(button) {

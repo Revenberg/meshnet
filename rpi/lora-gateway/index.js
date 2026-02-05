@@ -21,6 +21,64 @@ const connectedNodes = new Map();
 const lastSent = new Map();
 const lastAck = new Map();
 const PING_INTERVAL_MS = 60 * 1000;
+const RESPONSE_RETRY_COUNT = 1;
+const PAGES_RESPONSE_RETRY_COUNT = 6;
+const USERS_RESPONSE_RETRY_COUNT = 5;
+const RESPONSE_RETRY_DELAY_MS = 1500;
+const PAGES_RESPONSE_DELAY_MS = 4000;
+const USERS_RESPONSE_DELAY_MS = 6000;
+const RESPONSE_INITIAL_DELAY_MS = 800;
+const PAGES_RESPONSE_INITIAL_DELAY_MS = 5000;
+const USERS_RESPONSE_INITIAL_DELAY_MS = 6000;
+const USERS_RESPONSE_RETRY_DELAY_MS = 10000;
+const USERS_PART_REPEAT = 2;
+const USERS_PART_REPEAT_DELAY_MS = 1500;
+const PAGES_RESPONSE_RETRY_DELAY_MS = 12000;
+const PAGES_PART_REPEAT = 2;
+const PAGES_PART_REPEAT_DELAY_MS = 1200;
+const USERS_SYNC_MAX_CHUNK = 60;
+const PAGES_SYNC_MAX_CHUNK = 40;
+let pagesSendingUntil = 0;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function chunkPayload(payload, maxLen) {
+  if (!payload) return [];
+  const entries = payload.split(';').filter(Boolean);
+  const chunks = [];
+  let current = '';
+
+  for (const entry of entries) {
+    if (!current.length) {
+      current = entry;
+      continue;
+    }
+    if ((current.length + 1 + entry.length) <= maxLen) {
+      current += `;${entry}`;
+    } else {
+      chunks.push(current);
+      current = entry;
+    }
+  }
+
+  if (current.length) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function chunkPayloadByLength(payload, maxLen) {
+  if (!payload) return [];
+  const chunks = [];
+  let start = 0;
+  while (start < payload.length) {
+    const end = Math.min(start + maxLen, payload.length);
+    chunks.push(payload.substring(start, end));
+    start = end;
+  }
+  return chunks;
+}
 
 // ============ MIDDLEWARE ============
 app.use(bodyParser.json());
@@ -83,6 +141,9 @@ async function initializeGateway() {
 
 async function schedulePings() {
   try {
+    if (Date.now() < pagesSendingUntil) {
+      return;
+    }
     const res = await axios.get(`${BACKEND_URL}/api/nodes`);
     const nodes = res.data || [];
     const now = Date.now();
@@ -183,7 +244,25 @@ async function handleUsersRequest(nodeId) {
     const res = await axios.get(`${BACKEND_URL}/api/sync/users`);
     const users = res.data.users || [];
     const payload = users.map(u => `${u.username}|${u.password_hash}|${u.team}`).join(';');
-    await sendSerialRaw(`RESP;USERS;${payload}`);
+    const chunks = chunkPayload(payload, USERS_SYNC_MAX_CHUNK);
+    const total = chunks.length || 1;
+    await sleep(USERS_RESPONSE_INITIAL_DELAY_MS);
+    for (let attempt = 0; attempt < USERS_RESPONSE_RETRY_COUNT; attempt++) {
+      if (chunks.length === 0) {
+        await sendSerialRaw('LORA_TX;RESP;USERS;');
+      } else {
+        for (let i = 0; i < chunks.length; i += 1) {
+          for (let r = 0; r < USERS_PART_REPEAT; r += 1) {
+            await sendSerialRaw(`LORA_TX;RESP;USERS;PART;${i + 1};${total};${chunks[i]}`);
+            await sleep(USERS_PART_REPEAT_DELAY_MS);
+          }
+          await sleep(USERS_RESPONSE_DELAY_MS);
+        }
+      }
+      if (attempt < USERS_RESPONSE_RETRY_COUNT - 1) {
+        await sleep(USERS_RESPONSE_RETRY_DELAY_MS);
+      }
+    }
     lastSent.set(nodeId, Date.now());
     await axios.post(`${BACKEND_URL}/api/nodes/register`, { nodeId });
     await sendSerialRaw(`LORA_TX;BCAST;${Date.now()};SYSTEM;3;Node connected: ${nodeId}`);
@@ -196,8 +275,39 @@ async function handlePagesRequest(nodeId) {
   try {
     const res = await axios.get(`${BACKEND_URL}/api/sync/pages`, { params: { nodeId } });
     const pages = res.data.pages || [];
-    const payload = pages.map(p => `${p.team}|${encodeURIComponent(p.html || '')}`).join(';');
-    await sendSerialRaw(`RESP;PAGES;${payload}`);
+    let totalParts = 0;
+    for (const page of pages) {
+      const htmlEncoded = encodeURIComponent(page.html || '');
+      const parts = chunkPayloadByLength(htmlEncoded, PAGES_SYNC_MAX_CHUNK);
+      totalParts += (parts.length || 1);
+    }
+    const estimatedDurationMs = PAGES_RESPONSE_INITIAL_DELAY_MS + (totalParts * PAGES_RESPONSE_RETRY_COUNT * PAGES_RESPONSE_DELAY_MS) + 2000;
+    pagesSendingUntil = Date.now() + estimatedDurationMs;
+    await sleep(PAGES_RESPONSE_INITIAL_DELAY_MS);
+    for (let attempt = 0; attempt < PAGES_RESPONSE_RETRY_COUNT; attempt++) {
+      if (pages.length === 0) {
+        await sendSerialRaw('LORA_TX;RESP;PAGE;');
+        continue;
+      }
+      for (const page of pages) {
+        const teamEncoded = encodeURIComponent(page.team || '');
+        const htmlEncoded = encodeURIComponent(page.html || '');
+        const updatedEncoded = encodeURIComponent(page.updatedAt || '');
+        const parts = chunkPayloadByLength(htmlEncoded, PAGES_SYNC_MAX_CHUNK);
+        const total = parts.length || 1;
+        const sendParts = parts.length ? parts : [''];
+        for (let i = 0; i < sendParts.length; i += 1) {
+          for (let r = 0; r < PAGES_PART_REPEAT; r += 1) {
+            await sendSerialRaw(`LORA_TX;RESP;PAGE;${teamEncoded};${i + 1};${total};${updatedEncoded};${sendParts[i]}`);
+            await sleep(PAGES_PART_REPEAT_DELAY_MS);
+          }
+          await sleep(PAGES_RESPONSE_DELAY_MS);
+        }
+      }
+      if (attempt < PAGES_RESPONSE_RETRY_COUNT - 1) {
+        await sleep(PAGES_RESPONSE_RETRY_DELAY_MS);
+      }
+    }
     lastSent.set(nodeId, Date.now());
     await axios.post(`${BACKEND_URL}/api/nodes/register`, { nodeId });
   } catch (error) {

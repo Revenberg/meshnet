@@ -21,9 +21,18 @@ public:
     static void setPagesSynced(bool synced);
     static bool isUsersSynced();
     static bool isPagesSynced();
-    static void storeTeamPage(const String &team, const String &html);
+    static void savePagesNVS();
+    static void loadPagesNVS();
+    static void clearPages(bool clearNvs);
+    static void storeTeamPage(const String &team, const String &html, const String &updatedAt);
     static String getTeamPage(const String &team);
+    static String getTeamPageUpdatedAt(const String &team);
     static bool hasTeamPage(const String &team);
+    static int getStoredPagesCount();
+    static String getTeamNameAt(int index);
+    static String getTeamUpdatedAtAt(int index);
+    static int getTeamPageLengthAt(int index);
+    static String findTeamNameBySlug(const String &slug);
     static AsyncWebServer httpServer;
 private:
     static String makePage(String session);
@@ -33,4 +42,5 @@ private:
     static const int MAX_TEAM_PAGES = 10;
     static String teamNames[MAX_TEAM_PAGES];
     static String teamPages[MAX_TEAM_PAGES];
+    static String teamPageUpdatedAt[MAX_TEAM_PAGES];
 };

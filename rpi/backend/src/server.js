@@ -23,9 +23,174 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'meshnet-dev-secret-key-change-in-production';
+const USERS_SYNC_MAX_CHUNK = Number(process.env.USERS_SYNC_MAX_CHUNK || '120');
+const PAGES_SYNC_MAX_CHUNK = Number(process.env.PAGES_SYNC_MAX_CHUNK || '30');
+const PAGES_PUSH_RETRY_COUNT = Number(process.env.PAGES_PUSH_RETRY_COUNT || '3');
+const PAGES_PUSH_DELAY_MS = Number(process.env.PAGES_PUSH_DELAY_MS || '4000');
 
 function sha256Hex(value) {
   return crypto.createHash('sha256').update(value || '').digest('hex');
+}
+
+function chunkPayload(payload, maxLen) {
+  if (!payload) return [];
+  const entries = payload.split(';').filter(Boolean);
+  const chunks = [];
+  let current = '';
+
+  for (const entry of entries) {
+    if (!current.length) {
+      current = entry;
+      continue;
+    }
+    if ((current.length + 1 + entry.length) <= maxLen) {
+      current += `;${entry}`;
+    } else {
+      chunks.push(current);
+      current = entry;
+    }
+  }
+
+  if (current.length) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+function chunkPayloadByLength(payload, maxLen) {
+  if (!payload) return [];
+  const chunks = [];
+  let start = 0;
+  while (start < payload.length) {
+    const end = Math.min(start + maxLen, payload.length);
+    chunks.push(payload.substring(start, end));
+    start = end;
+  }
+  return chunks;
+}
+
+async function sendUsersSyncViaGateway(usersPayload, loraGatewayUrl) {
+  const chunks = chunkPayload(usersPayload, USERS_SYNC_MAX_CHUNK);
+  if (chunks.length === 0) {
+    await axios.post(`${loraGatewayUrl}/relay/packet`, {
+      packet: 'LORA_TX;RESP;USERS;'
+    }, { timeout: 5000 });
+    return;
+  }
+
+  const total = chunks.length;
+  for (let i = 0; i < chunks.length; i += 1) {
+    await axios.post(`${loraGatewayUrl}/relay/packet`, {
+      packet: `LORA_TX;RESP;USERS;PART;${i + 1};${total};${chunks[i]}`
+    }, { timeout: 5000 });
+  }
+}
+
+async function sendPagesSyncViaGateway(pagesPayload, loraGatewayUrl) {
+  const entries = await getPagesSyncEntries();
+  if (entries.length === 0) {
+    await axios.post(`${loraGatewayUrl}/relay/packet`, {
+      packet: 'LORA_TX;RESP;PAGE;'
+    }, { timeout: 5000 });
+    return;
+  }
+
+  for (let attempt = 0; attempt < PAGES_PUSH_RETRY_COUNT; attempt += 1) {
+    for (const entry of entries) {
+      const teamEncoded = encodeURIComponent(entry.team || '');
+      const htmlEncoded = encodeURIComponent(entry.html || '');
+      const updatedEncoded = encodeURIComponent(entry.updatedAt || '');
+      const parts = chunkPayloadByLength(htmlEncoded, PAGES_SYNC_MAX_CHUNK);
+      const total = parts.length || 1;
+      const sendParts = parts.length ? parts : [''];
+      for (let i = 0; i < sendParts.length; i += 1) {
+        await axios.post(`${loraGatewayUrl}/relay/packet`, {
+          packet: `LORA_TX;RESP;PAGE;${teamEncoded};${i + 1};${total};${updatedEncoded};${sendParts[i]}`
+        }, { timeout: 5000 });
+      }
+    }
+    if (attempt < PAGES_PUSH_RETRY_COUNT - 1) {
+      await new Promise(resolve => setTimeout(resolve, PAGES_PUSH_DELAY_MS));
+    }
+  }
+}
+
+async function getUsersSyncPayload() {
+  const [rows] = await dbPool.query(
+    'SELECT u.username, g.name AS team, u.passwordSha256 '
+    + 'FROM users u '
+    + 'JOIN `groups` g ON u.groupId = g.id '
+    + 'WHERE u.isActive = true '
+    + 'ORDER BY u.username'
+  );
+  return rows
+    .map(r => `${r.username}|${r.passwordSha256 || ''}|${r.team}`)
+    .join(';');
+}
+
+async function getPagesSyncEntries() {
+  const [rows] = await dbPool.query(
+    'SELECT g.name AS team, p.content AS html, p.updatedAt AS updatedAt '
+    + 'FROM pages p '
+    + 'JOIN `groups` g ON p.groupId = g.id '
+    + 'WHERE p.isActive = true '
+    + 'ORDER BY g.name, p.updatedAt DESC'
+  );
+
+  const pageMap = new Map();
+  for (const row of rows) {
+    const team = row.team;
+    if (!team) {
+      continue;
+    }
+    const html = row.html || '';
+    const updatedAt = row.updatedAt ? new Date(row.updatedAt).toISOString() : '';
+    if (!pageMap.has(team)) {
+      pageMap.set(team, { html, updatedAt });
+      continue;
+    }
+    const current = pageMap.get(team);
+    const currentTs = current?.updatedAt ? Date.parse(current.updatedAt) : 0;
+    const newTs = updatedAt ? Date.parse(updatedAt) : 0;
+    if (newTs >= currentTs) {
+      pageMap.set(team, { html, updatedAt });
+    }
+  }
+
+  return Array.from(pageMap.entries()).map(([team, payload]) => ({
+    team,
+    html: payload.html || '',
+    updatedAt: payload.updatedAt || ''
+  }));
+}
+
+async function getPagesSyncPayload() {
+  const entries = await getPagesSyncEntries();
+  return entries
+    .map(entry => `${entry.team}|${encodeURIComponent(entry.html)}|${encodeURIComponent(entry.updatedAt)}`)
+    .join(';');
+}
+
+async function broadcastSyncToAllHosts() {
+  if (!dbPool) return;
+
+  const loraGatewayUrl = process.env.LORA_GATEWAY_URL || 'http://127.0.0.1:3002';
+  try {
+    const usersPayload = await getUsersSyncPayload();
+    await sendUsersSyncViaGateway(usersPayload, loraGatewayUrl);
+  } catch (error) {
+    console.warn('[SYNC PUSH] Users sync failed:', error.message);
+  }
+
+  try {
+    const pagesPayload = await getPagesSyncPayload();
+    await axios.post(`${loraGatewayUrl}/relay/packet`, {
+      packet: `LORA_TX;RESP;PAGES;${pagesPayload}`
+    }, { timeout: 5000 });
+  } catch (error) {
+    console.warn('[SYNC PUSH] Pages sync failed:', error.message);
+  }
 }
 
 function extractMacFromNodeId(nodeId) {
@@ -39,6 +204,11 @@ function extractVersionFromNodeId(nodeId) {
   if (!nodeId) return null;
   const match = nodeId.match(/_(\d+\.\d+\.\d+)$/);
   return match ? match[1] : null;
+}
+
+function stripVersionFromNodeId(nodeId) {
+  if (!nodeId) return '';
+  return nodeId.replace(/_(\d+\.\d+\.\d+)$/, '');
 }
 
 // ============ MIDDLEWARE ============
@@ -216,6 +386,79 @@ async function initializeDatabase() {
   }
 }
 
+function buildDefaultPageContent(groupName, nodeIdBase) {
+  const safeGroup = groupName || 'Team';
+  const safeNode = nodeIdBase || 'Unknown Node';
+  return `${safeGroup} page for ${safeNode}`;
+}
+
+async function ensureDefaultPagesForGroup(groupId, groupName) {
+  if (!dbPool || !groupId) return 0;
+
+  const [nodes] = await dbPool.query('SELECT nodeId FROM nodes');
+  let created = 0;
+
+  for (const node of nodes) {
+    const nodeId = node.nodeId;
+    if (!nodeId) continue;
+    const nodeIdBase = stripVersionFromNodeId(nodeId) || nodeId;
+
+    const [existing] = await dbPool.query(
+      'SELECT pageId FROM pages WHERE nodeId = ? AND groupId = ? LIMIT 1',
+      [nodeId, groupId]
+    );
+    if (existing.length > 0) continue;
+
+    const pageId = uuidv4();
+    const title = `${groupName} Page`;
+    const content = buildDefaultPageContent(groupName, nodeIdBase);
+    await dbPool.query(
+      'INSERT INTO pages (pageId, nodeId, groupId, title, content, refreshInterval, isActive) VALUES (?, ?, ?, ?, ?, ?, true)',
+      [pageId, nodeId, groupId, title, content, 30]
+    );
+    created += 1;
+  }
+
+  return created;
+}
+
+async function ensureDefaultPagesForNode(nodeId) {
+  if (!dbPool || !nodeId) return 0;
+
+  const nodeIdBase = stripVersionFromNodeId(nodeId) || nodeId;
+  const likePattern = nodeIdBase.replace(/[!%_]/g, '!$&') + '%';
+  const macAddress = extractMacFromNodeId(nodeId) || nodeId.substring(0, 17);
+
+  await dbPool.query(
+    'INSERT INTO nodes (nodeId, macAddress, functionalName, isActive, lastSeen) VALUES (?, ?, ?, true, NOW()) ON DUPLICATE KEY UPDATE lastSeen = NOW()',
+    [nodeId, macAddress, nodeId]
+  );
+
+  const [groups] = await dbPool.query('SELECT id, name FROM `groups`');
+  if (!groups.length) return 0;
+
+  const [existingPages] = await dbPool.query(
+    'SELECT groupId FROM pages WHERE (nodeId = ? OR nodeId = ? OR nodeId LIKE ? ESCAPE "!") AND groupId IS NOT NULL',
+    [nodeId, nodeIdBase, likePattern]
+  );
+  const existingGroupIds = new Set(existingPages.map(row => row.groupId));
+
+  let created = 0;
+  for (const group of groups) {
+    if (existingGroupIds.has(group.id)) continue;
+    const pageId = uuidv4();
+    const title = `${group.name} Page`;
+    const content = buildDefaultPageContent(group.name, nodeIdBase);
+    await dbPool.query(
+      'INSERT INTO pages (pageId, nodeId, groupId, title, content, refreshInterval, isActive) VALUES (?, ?, ?, ?, ?, ?, true)',
+      [pageId, nodeId, group.id, title, content, 30]
+    );
+    created += 1;
+  }
+
+  return created;
+}
+
 // ============ API ROUTES ============
 
 // Health check
@@ -373,16 +616,65 @@ app.get('/api/sync/pages', async (req, res) => {
   try {
     if (!dbPool) return res.json({ status: 'success', page_count: 0, pages: [] });
     const nodeId = req.query.nodeId || null;
-    let pagesQuery = 'SELECT g.name AS team, p.content AS html FROM pages p LEFT JOIN `groups` g ON p.groupId = g.id WHERE p.isActive = true';
+    let pagesQuery = 'SELECT g.name AS team, p.content AS html, p.updatedAt AS updatedAt FROM pages p LEFT JOIN `groups` g ON p.groupId = g.id WHERE p.isActive = true';
     const params = [];
     if (nodeId) {
-      pagesQuery += ' AND p.nodeId = ?';
-      params.push(nodeId);
+      let baseNodeId = nodeId;
+      const lastUnderscore = nodeId.lastIndexOf('_');
+      if (lastUnderscore > 0) {
+        baseNodeId = nodeId.substring(0, lastUnderscore);
+      }
+      pagesQuery += " AND (p.nodeId = ? OR p.nodeId = ? OR p.nodeId LIKE ? ESCAPE '!')";
+      params.push(nodeId, baseNodeId, baseNodeId + '!_%');
     }
     const [pages] = await dbPool.query(pagesQuery, params);
-    res.json({ status: 'success', page_count: pages.length, pages });
+    const filtered = pages
+      .filter(p => p.team)
+      .map(p => ({
+        team: p.team,
+        html: p.html,
+        updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : ''
+      }));
+    res.json({ status: 'success', page_count: filtered.length, pages: filtered });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Push users/pages sync to all nodes
+app.post('/api/sync/push', async (req, res) => {
+  try {
+    if (!dbPool) return res.status(503).json({ error: 'Database not available' });
+    await broadcastSyncToAllHosts();
+    res.json({ status: 'ok' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Push users sync to all nodes
+app.post('/api/sync/push/users', async (req, res) => {
+  try {
+    if (!dbPool) return res.status(503).json({ error: 'Database not available' });
+    const loraGatewayUrl = process.env.LORA_GATEWAY_URL || 'http://127.0.0.1:3002';
+    const usersPayload = await getUsersSyncPayload();
+    await sendUsersSyncViaGateway(usersPayload, loraGatewayUrl);
+    res.json({ status: 'ok' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Push pages sync to all nodes
+app.post('/api/sync/push/pages', async (req, res) => {
+  try {
+    if (!dbPool) return res.status(503).json({ error: 'Database not available' });
+    const loraGatewayUrl = process.env.LORA_GATEWAY_URL || 'http://127.0.0.1:3002';
+    const pagesPayload = await getPagesSyncPayload();
+    await sendPagesSyncViaGateway(pagesPayload, loraGatewayUrl);
+    res.json({ status: 'ok' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -593,6 +885,7 @@ app.post('/api/users', async (req, res) => {
       [userId, username, email, passwordHash, passwordSha256, groupId]
     );
     
+    await broadcastSyncToAllHosts();
     res.json({ status: 'created', userId });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -636,6 +929,7 @@ app.put('/api/users/:userId', async (req, res) => {
       );
     }
     
+    await broadcastSyncToAllHosts();
     res.json({ success: true, status: 'updated' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -648,6 +942,7 @@ app.delete('/api/users/:userId', async (req, res) => {
     if (!dbPool) return res.json({ success: true, warning: 'Database not available' });
     
     await dbPool.query('DELETE FROM users WHERE userId = ?', [req.params.userId]);
+    await broadcastSyncToAllHosts();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -680,17 +975,81 @@ app.get('/api/sync/users', async (req, res) => {
 app.get('/api/sync/pages', async (req, res) => {
   try {
     if (!dbPool) return res.json({ status: 'success', page_count: 0, pages: [] });
-    const [rows] = await dbPool.query(
-      'SELECT g.name AS team, p.content AS html '
-      + 'FROM pages p '
-      + 'JOIN `groups` g ON p.groupId = g.id '
-      + 'WHERE p.isActive = true '
-      + 'ORDER BY g.name'
-    );
-    const pages = rows.map(r => ({ team: r.team, html: r.html || '' }));
+    const nodeId = req.query.nodeId || '';
+    if (nodeId) {
+      await ensureDefaultPagesForNode(nodeId);
+    }
+
+    const nodeIdBase = nodeId ? (stripVersionFromNodeId(nodeId) || nodeId) : '';
+    const likePattern = nodeIdBase ? nodeIdBase.replace(/[!%_]/g, '!$&') + '%' : '';
+
+    const [rows] = nodeId
+      ? await dbPool.query(
+          'SELECT g.name AS team, p.content AS html, p.updatedAt AS updatedAt '
+          + 'FROM pages p '
+          + 'JOIN `groups` g ON p.groupId = g.id '
+          + 'WHERE p.isActive = true AND (p.nodeId = ? OR p.nodeId = ? OR p.nodeId LIKE ? ESCAPE "!") '
+          + 'ORDER BY g.name, p.updatedAt DESC',
+          [nodeId, nodeIdBase, likePattern]
+        )
+      : await dbPool.query(
+          'SELECT g.name AS team, p.content AS html, p.updatedAt AS updatedAt '
+          + 'FROM pages p '
+          + 'JOIN `groups` g ON p.groupId = g.id '
+          + 'WHERE p.isActive = true '
+          + 'ORDER BY g.name, p.updatedAt DESC'
+        );
+
+    const pageMap = new Map();
+    for (const row of rows) {
+      const team = row.team;
+      if (!team) {
+        continue;
+      }
+      const html = row.html || '';
+      const updatedAt = row.updatedAt ? new Date(row.updatedAt).toISOString() : '';
+      if (!pageMap.has(team)) {
+        pageMap.set(team, { html, updatedAt });
+        continue;
+      }
+      const current = pageMap.get(team);
+      const currentTs = current?.updatedAt ? Date.parse(current.updatedAt) : 0;
+      const newTs = updatedAt ? Date.parse(updatedAt) : 0;
+      if (newTs >= currentTs) {
+        pageMap.set(team, { html, updatedAt });
+      }
+    }
+
+    const pages = Array.from(pageMap.entries()).map(([team, payload]) => ({
+      team,
+      html: payload.html,
+      updatedAt: payload.updatedAt
+    }));
     res.json({ status: 'success', page_count: pages.length, pages });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Ensure default pages exist for nodes/groups
+app.post('/api/pages/ensure-defaults', async (req, res) => {
+  try {
+    if (!dbPool) return res.status(503).json({ error: 'Database not available' });
+    const { nodeId } = req.body || {};
+
+    let created = 0;
+    if (nodeId) {
+      created += await ensureDefaultPagesForNode(nodeId);
+    } else {
+      const [nodes] = await dbPool.query('SELECT nodeId FROM nodes');
+      for (const node of nodes) {
+        created += await ensureDefaultPagesForNode(node.nodeId);
+      }
+    }
+
+    res.json({ status: 'ok', created });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -822,12 +1181,15 @@ app.post('/api/groups', async (req, res) => {
     const { name, description, permissions } = req.body;
     const groupId = uuidv4();
     
-    await dbPool.query(
+    const [result] = await dbPool.query(
       'INSERT INTO `groups` (groupId, name, description, permissions) VALUES (?, ?, ?, ?)',
       [groupId, name, description, JSON.stringify(permissions || [])]
     );
+
+    const createdPages = await ensureDefaultPagesForGroup(result.insertId, name || 'Group');
     
-    res.json({ groupId, status: 'created' });
+    await broadcastSyncToAllHosts();
+    res.json({ groupId, status: 'created', pagesCreated: createdPages });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -872,7 +1234,9 @@ app.delete('/api/groups/:groupId', async (req, res) => {
   try {
     if (!dbPool) return res.json({ success: true, warning: 'Database not available' });
     
+    await dbPool.query('DELETE FROM pages WHERE groupId = ?', [req.params.groupId]);
     await dbPool.query('DELETE FROM `groups` WHERE id = ?', [req.params.groupId]);
+    await broadcastSyncToAllHosts();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -948,6 +1312,7 @@ app.post('/api/pages', async (req, res) => {
       isActive !== false
     ]);
     
+    await broadcastSyncToAllHosts();
     res.json({ pageId, status: 'created', nodeId: nodeId });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -966,6 +1331,7 @@ app.put('/api/pages/:pageId', async (req, res) => {
       [title || null, content || null, imageUrl || null, isActive !== undefined ? isActive : null, req.params.pageId]
     );
     
+    await broadcastSyncToAllHosts();
     res.json({ status: 'updated' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -978,6 +1344,7 @@ app.delete('/api/pages/:pageId', async (req, res) => {
     if (!dbPool) return res.json({ success: true, warning: 'Database not available' });
     
     await dbPool.query('DELETE FROM pages WHERE pageId = ?', [req.params.pageId]);
+    await broadcastSyncToAllHosts();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

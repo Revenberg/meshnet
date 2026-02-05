@@ -333,6 +333,14 @@ bool User::setUsersFromSyncPayload(const String &payload)
         return false;
     }
 
+    // Preserve existing tokens so sessions survive sync refreshes
+    NodeUser oldUsers[MAX_USERS];
+    int oldCount = User::userCount;
+    for (int i = 0; i < oldCount && i < MAX_USERS; i++)
+    {
+        oldUsers[i] = User::users[i];
+    }
+
     User::clearUsers();
 
     int start = 0;
@@ -356,7 +364,18 @@ bool User::setUsersFromSyncPayload(const String &payload)
                 User::users[User::userCount].username = username;
                 User::users[User::userCount].passwordHash = pwdHash;
                 User::users[User::userCount].team = team;
-                User::users[User::userCount].token = User::generateToken();
+
+                // Reuse token if user existed before, otherwise generate a new one
+                String preservedToken = "";
+                for (int i = 0; i < oldCount; i++)
+                {
+                    if (oldUsers[i].username.equalsIgnoreCase(username) && oldUsers[i].token.length() > 0)
+                    {
+                        preservedToken = oldUsers[i].token;
+                        break;
+                    }
+                }
+                User::users[User::userCount].token = preservedToken.length() > 0 ? preservedToken : User::generateToken();
                 Serial.printf("[USER-SYNC] Added user: %s | Team: %s\n", username.c_str(), team.c_str());
                 User::userCount++;
             }
@@ -370,6 +389,7 @@ bool User::setUsersFromSyncPayload(const String &payload)
     }
 
     Serial.printf("[USER-SYNC] Total users loaded: %d\n", User::userCount);
+    User::saveUsersNVS();
     return User::userCount > 0;
 }
 
@@ -407,6 +427,14 @@ bool User::syncUsersFromDatabase(const String &apiUrl)
         return false;
     }
     
+    // Preserve existing tokens so sessions survive sync refreshes
+    NodeUser oldUsers[MAX_USERS];
+    int oldCount = User::userCount;
+    for (int i = 0; i < oldCount && i < MAX_USERS; i++)
+    {
+        oldUsers[i] = User::users[i];
+    }
+
     // Clear existing users
     User::userCount = 0;
     
@@ -455,7 +483,18 @@ bool User::syncUsersFromDatabase(const String &apiUrl)
         User::users[User::userCount].username = username;
         User::users[User::userCount].team = team;
         User::users[User::userCount].passwordHash = pwdHash;
-        User::users[User::userCount].token = User::generateToken();
+
+        // Reuse token if user existed before, otherwise generate a new one
+        String preservedToken = "";
+        for (int i = 0; i < oldCount; i++)
+        {
+            if (oldUsers[i].username.equalsIgnoreCase(username) && oldUsers[i].token.length() > 0)
+            {
+                preservedToken = oldUsers[i].token;
+                break;
+            }
+        }
+        User::users[User::userCount].token = preservedToken.length() > 0 ? preservedToken : User::generateToken();
         
         User::userCount++;
         userStartPos = objectEnd + 1;

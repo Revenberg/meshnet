@@ -584,6 +584,46 @@ app.delete('/api/pages/:pageId', async (req, res) => {
   }
 });
 
+// Push users/pages sync to nodes
+app.post('/api/sync/push', async (req, res) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/sync/push`, req.body || {});
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Push users sync to nodes
+app.post('/api/sync/push/users', async (req, res) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/sync/push/users`, req.body || {});
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Push pages sync to nodes
+app.post('/api/sync/push/pages', async (req, res) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/sync/push/pages`, req.body || {});
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Ensure default pages exist
+app.post('/api/pages/ensure-defaults', async (req, res) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/pages/ensure-defaults`, req.body || {});
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create page (broadcast message)
 app.post('/api/broadcast', async (req, res) => {
   try {

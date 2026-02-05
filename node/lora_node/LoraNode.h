@@ -74,11 +74,13 @@ public:
   static bool isPagesSynced();
   static void setUsersSynced(bool synced);
   static void setPagesSynced(bool synced);
+  static bool isUsersSyncInProgress();
   static void transmitRaw(const String &packet);
   static int msgWriteIndex;
   static int onlineCount;
   static bool usersSynced;
   static bool pagesSynced;
+  static unsigned long lastSyncAttempt;
   static String seenMsgIds[MAX_MSGS];
   static int seenMsgIndex;
 

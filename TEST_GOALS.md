@@ -25,3 +25,6 @@
 ## Resultaat
 - Testrapport met status per endpoint
 - Coverage report >= 80%
+
+## Test Playbook
+Zie [TEST_PLAYBOOK.md](TEST_PLAYBOOK.md) voor zelf-uitvoerbare stappen, verwachte uitkomsten en herstelacties.

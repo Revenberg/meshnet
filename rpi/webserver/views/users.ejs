@@ -45,7 +45,10 @@
 
 <div class="page-header">
   <h2>User Management</h2>
-  <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-primary" onclick="syncUsers()">🔁 Sync Users</button>
+    <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+  </div>
 </div>
 
 <div class="section">
@@ -249,6 +252,16 @@ async function deleteUser(userId) {
     } catch (error) {
       console.error('Error deleting user:', error);
     }
+  }
+}
+
+async function syncUsers() {
+  try {
+    await axios.post('/api/sync/push/users');
+    alert('Users sync pushed to Heltec nodes.');
+  } catch (error) {
+    console.error('Failed to sync users:', error);
+    alert('Failed to sync users.');
   }
 }
 </script>

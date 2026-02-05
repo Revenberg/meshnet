@@ -2,14 +2,18 @@
 #include <WiFi.h>
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <Preferences.h>
 #include "User.h"
 #include "NodeWebServer.h"
 #include "LoraNode.h"
+#include "version.h"
 
 // ====== Config ======
 #define DNS_PORT 53
 IPAddress apIP(192, 168, 3, 1);
-String AP_SSID = "MeshNet V1.0.0";
+String AP_SSID = String(FIRMWARE_NAME) + " V" + FIRMWARE_VERSION;
 String AP_PASS = "";
 
 /*#define MAX_MSGS 20
@@ -30,6 +34,9 @@ bool NodeWebServer::usersSynced = false;
 bool NodeWebServer::pagesSynced = false;
 String NodeWebServer::teamNames[MAX_TEAM_PAGES];
 String NodeWebServer::teamPages[MAX_TEAM_PAGES];
+String NodeWebServer::teamPageUpdatedAt[MAX_TEAM_PAGES];
+static Preferences pagesPrefs;
+static unsigned long lastSyncRequestMs = 0;
 
 // ====== Helpers ======
 String escapeHtml(const String &input)
@@ -43,19 +50,201 @@ String escapeHtml(const String &input)
     return out;
 }
 
+String toLowerCopy(const String &input)
+{
+  String out = input;
+  out.toLowerCase();
+  return out;
+}
+
+String urlDecodeSegment(const String &input)
+{
+  String out;
+  out.reserve(input.length());
+  for (size_t i = 0; i < input.length(); i++)
+  {
+    char c = input.charAt(i);
+    if (c == '+')
+    {
+      out += ' ';
+    }
+    else if (c == '%' && i + 2 < input.length())
+    {
+      char hex[3] = { (char)input.charAt(i + 1), (char)input.charAt(i + 2), 0 };
+      char decoded = (char)strtol(hex, nullptr, 16);
+      out += decoded;
+      i += 2;
+    }
+    else
+    {
+      out += c;
+    }
+  }
+  return out;
+}
+
+String slugifyTeam(const String &team)
+{
+  String out;
+  out.reserve(team.length());
+  for (size_t i = 0; i < team.length(); i++)
+  {
+    char c = team.charAt(i);
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+    {
+      out += (char)tolower(c);
+    }
+    else if (c == ' ' || c == '-' || c == '_')
+    {
+      if (out.length() == 0 || out.charAt(out.length() - 1) == '-')
+      {
+        continue;
+      }
+      out += '-';
+    }
+  }
+  return out;
+}
+
+static String normalizeTeamName(const String &team)
+{
+  String out = team;
+  out.trim();
+  out.toLowerCase();
+  return out;
+}
+
+String NodeWebServer::findTeamNameBySlug(const String &slug)
+{
+  String normalized = toLowerCopy(urlDecodeSegment(slug));
+  normalized.replace("_", "-");
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    if (teamNames[i].length() == 0)
+    {
+      continue;
+    }
+    String teamName = teamNames[i];
+    if (toLowerCopy(teamName) == normalized)
+    {
+      return teamName;
+    }
+    if (slugifyTeam(teamName) == normalized)
+    {
+      return teamName;
+    }
+  }
+  return "";
+}
+
 void NodeWebServer::setUsersSynced(bool synced) { usersSynced = synced; }
 void NodeWebServer::setPagesSynced(bool synced) { pagesSynced = synced; }
 bool NodeWebServer::isUsersSynced() { return usersSynced; }
-bool NodeWebServer::isPagesSynced() { return pagesSynced; }
+bool NodeWebServer::isPagesSynced()
+{
+  if (pagesSynced)
+  {
+    return true;
+  }
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    if (teamNames[i].length() > 0 && teamPages[i].length() > 0)
+    {
+      return true;
+    }
+  }
+  return false;
+}
 
-void NodeWebServer::storeTeamPage(const String &team, const String &html)
+void NodeWebServer::savePagesNVS()
+{
+  pagesPrefs.begin("NodePages", false);
+  pagesPrefs.clear();
+
+  int stored = 0;
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    if (teamNames[i].length() == 0 || teamPages[i].length() == 0)
+    {
+      continue;
+    }
+    pagesPrefs.putString(("page" + String(stored) + "_team").c_str(), teamNames[i]);
+    pagesPrefs.putString(("page" + String(stored) + "_html").c_str(), teamPages[i]);
+    pagesPrefs.putString(("page" + String(stored) + "_updated").c_str(), teamPageUpdatedAt[i]);
+    stored++;
+  }
+
+  pagesPrefs.putInt("pageCount", stored);
+  pagesPrefs.end();
+  Serial.printf("[TEAM-PAGE] Saved %d pages to NVS\n", stored);
+}
+
+void NodeWebServer::loadPagesNVS()
 {
   for (int i = 0; i < MAX_TEAM_PAGES; i++)
   {
-    if (teamNames[i] == team || teamNames[i].length() == 0)
+    teamNames[i] = "";
+    teamPages[i] = "";
+    teamPageUpdatedAt[i] = "";
+  }
+
+  pagesPrefs.begin("NodePages", true);
+  int count = pagesPrefs.getInt("pageCount", 0);
+  int stored = 0;
+  for (int i = 0; i < count && stored < MAX_TEAM_PAGES; i++)
+  {
+    String team = pagesPrefs.getString(("page" + String(i) + "_team").c_str(), "");
+    String html = pagesPrefs.getString(("page" + String(i) + "_html").c_str(), "");
+    String updated = pagesPrefs.getString(("page" + String(i) + "_updated").c_str(), "");
+    if (team.length() == 0 || html.length() == 0)
     {
-      teamNames[i] = team;
+      continue;
+    }
+    teamNames[stored] = team;
+    teamPages[stored] = html;
+    teamPageUpdatedAt[stored] = updated;
+    stored++;
+  }
+  pagesPrefs.end();
+
+  pagesSynced = stored > 0;
+  Serial.printf("[TEAM-PAGE] Loaded %d pages from NVS\n", stored);
+}
+
+void NodeWebServer::clearPages(bool clearNvs)
+{
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    teamNames[i] = "";
+    teamPages[i] = "";
+    teamPageUpdatedAt[i] = "";
+  }
+  pagesSynced = false;
+
+  if (clearNvs)
+  {
+    pagesPrefs.begin("NodePages", false);
+    pagesPrefs.clear();
+    pagesPrefs.end();
+    Serial.println("[TEAM-PAGE] Cleared pages from NVS");
+  }
+}
+
+void NodeWebServer::storeTeamPage(const String &team, const String &html, const String &updatedAt)
+{
+  String trimmedTeam = team;
+  trimmedTeam.trim();
+  String normalized = normalizeTeamName(trimmedTeam);
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    String existingNorm = normalizeTeamName(teamNames[i]);
+    if (existingNorm == normalized || teamNames[i].length() == 0)
+    {
+      teamNames[i] = trimmedTeam;
       teamPages[i] = html;
+      teamPageUpdatedAt[i] = updatedAt;
+      Serial.printf("[TEAM-PAGE] Stored team page: %s (len=%d) slot=%d updated=%s\n", team.c_str(), html.length(), i, updatedAt.c_str());
+      savePagesNVS();
       return;
     }
   }
@@ -63,11 +252,47 @@ void NodeWebServer::storeTeamPage(const String &team, const String &html)
 
 String NodeWebServer::getTeamPage(const String &team)
 {
+  String normalized = normalizeTeamName(team);
   for (int i = 0; i < MAX_TEAM_PAGES; i++)
   {
-    if (teamNames[i] == team)
+    if (normalizeTeamName(teamNames[i]) == normalized)
     {
       return teamPages[i];
+    }
+  }
+  String resolved = NodeWebServer::findTeamNameBySlug(team);
+  if (resolved.length() > 0)
+  {
+    for (int i = 0; i < MAX_TEAM_PAGES; i++)
+    {
+      if (teamNames[i] == resolved)
+      {
+        return teamPages[i];
+      }
+    }
+  }
+  return "";
+}
+
+String NodeWebServer::getTeamPageUpdatedAt(const String &team)
+{
+  String normalized = normalizeTeamName(team);
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    if (normalizeTeamName(teamNames[i]) == normalized)
+    {
+      return teamPageUpdatedAt[i];
+    }
+  }
+  String resolved = NodeWebServer::findTeamNameBySlug(team);
+  if (resolved.length() > 0)
+  {
+    for (int i = 0; i < MAX_TEAM_PAGES; i++)
+    {
+      if (teamNames[i] == resolved)
+      {
+        return teamPageUpdatedAt[i];
+      }
     }
   }
   return "";
@@ -75,14 +300,66 @@ String NodeWebServer::getTeamPage(const String &team)
 
 bool NodeWebServer::hasTeamPage(const String &team)
 {
+  String normalized = normalizeTeamName(team);
   for (int i = 0; i < MAX_TEAM_PAGES; i++)
   {
-    if (teamNames[i] == team && teamPages[i].length() > 0)
+    if (normalizeTeamName(teamNames[i]) == normalized && teamPages[i].length() > 0)
     {
       return true;
     }
   }
+  String resolved = NodeWebServer::findTeamNameBySlug(team);
+  if (resolved.length() > 0)
+  {
+    for (int i = 0; i < MAX_TEAM_PAGES; i++)
+    {
+      if (teamNames[i] == resolved && teamPages[i].length() > 0)
+      {
+        return true;
+      }
+    }
+  }
   return false;
+}
+
+int NodeWebServer::getStoredPagesCount()
+{
+  int count = 0;
+  for (int i = 0; i < MAX_TEAM_PAGES; i++)
+  {
+    if (teamNames[i].length() > 0 && teamPages[i].length() > 0)
+    {
+      count++;
+    }
+  }
+  return count;
+}
+
+String NodeWebServer::getTeamNameAt(int index)
+{
+  if (index < 0 || index >= MAX_TEAM_PAGES)
+  {
+    return "";
+  }
+  return teamNames[index];
+}
+
+String NodeWebServer::getTeamUpdatedAtAt(int index)
+{
+  if (index < 0 || index >= MAX_TEAM_PAGES)
+  {
+    return "";
+  }
+  return teamPageUpdatedAt[index];
+}
+
+int NodeWebServer::getTeamPageLengthAt(int index)
+{
+  if (index < 0 || index >= MAX_TEAM_PAGES)
+  {
+    return 0;
+  }
+  return teamPages[index].length();
 }
 
 String getSessionToken(AsyncWebServerRequest *request)
@@ -269,7 +546,7 @@ const char PAGE_INDEX[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div class="header">
-    <h1>🎮 GhostNet Dashboard</h1>
+    <h1>🎮 MeshNet Dashboard</h1>
     <a href='/logout' class='logout-btn'>Logout</a>
   </div>
 
@@ -299,6 +576,80 @@ const char PAGE_INDEX[] PROGMEM = R"rawliteral(
 
   %ONLINE_NODES%
 
+  <script>
+    (function () {
+      const AP_HOST = "192.168.3.1";
+      const AP_URL = "http://192.168.3.1/";
+      const TOKEN_KEY = "meshnetSession";
+      const initialToken = "%TOKEN%";
+
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function storeToken(token) {
+        if (token && token.length > 0) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+      }
+
+      function getStoredToken() {
+        return localStorage.getItem(TOKEN_KEY) || "";
+      }
+
+      function clearToken() {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+
+      function redirectToAp(token) {
+        const target = token ? (AP_URL + "?token=" + encodeURIComponent(token)) : AP_URL;
+        if (window.location.href !== target) {
+          window.location.href = target;
+        }
+      }
+
+      function ensureSession() {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('logout') === '1') {
+          clearToken();
+          url.searchParams.delete('logout');
+          history.replaceState({}, '', url.toString());
+        }
+
+        if (initialToken && initialToken.length > 0) {
+          storeToken(initialToken);
+        }
+
+        const cookieToken = getCookie('session');
+        if (cookieToken) {
+          storeToken(cookieToken);
+        } else {
+          const cached = getStoredToken();
+          if (cached && !url.searchParams.get('token')) {
+            redirectToAp(cached);
+          }
+        }
+      }
+
+      function attemptReconnect() {
+        if (window.location.hostname !== AP_HOST) {
+          const cached = getStoredToken();
+          redirectToAp(cached);
+        }
+      }
+
+      window.addEventListener('online', attemptReconnect);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+          attemptReconnect();
+        }
+      });
+      setInterval(attemptReconnect, 15000);
+      ensureSession();
+    })();
+  </script>
+
 </body>
 </html>
 )rawliteral";
@@ -308,10 +659,20 @@ String NodeWebServer::makePage(String session)
     String page(PAGE_INDEX);
     String username = User::getNameBySession(session);
     String team = User::getUserTeamBySession(session);
-    String title = "Game on Webserver";
+    String title = String(FIRMWARE_NAME) + " V" + FIRMWARE_VERSION;
   String syncStatus;
   bool usersOk = NodeWebServer::isUsersSynced();
   bool pagesOk = NodeWebServer::isPagesSynced();
+  const unsigned long nowMs = millis();
+  if ((!usersOk || !pagesOk) && (nowMs - lastSyncRequestMs > 10000)) {
+    if (!usersOk) {
+      LoraNode::requestUsers();
+    }
+    if (!pagesOk) {
+      LoraNode::requestPages();
+    }
+    lastSyncRequestMs = nowMs;
+  }
   if (usersOk && pagesOk)
   {
     syncStatus = "<div class='sync-status ok'>✅ Users en pagina's gesynchroniseerd</div>";
@@ -325,25 +686,68 @@ String NodeWebServer::makePage(String session)
     syncStatus += "</div>";
   }
   String teamPageSection;
-  if (team.length() > 0 && NodeWebServer::hasTeamPage(team))
+  bool hasTeamPage = (team.length() > 0 && NodeWebServer::hasTeamPage(team));
+  String teamSlug = (team.length() > 0) ? slugifyTeam(team) : "";
+  if (team.length() > 0 && hasTeamPage)
   {
-    teamPageSection = "<div class='box'><h3>📄 Team Pagina</h3>" + NodeWebServer::getTeamPage(team) + "</div>";
+    String updatedAt = NodeWebServer::getTeamPageUpdatedAt(team);
+    String updatedHtml = updatedAt.length() > 0 ? ("<p><small>Laatst bijgewerkt: " + escapeHtml(updatedAt) + "</small></p>") : "";
+    teamPageSection = "<div class='box' id='team-page'><h3>📄 Team Pagina</h3>" + updatedHtml + NodeWebServer::getTeamPage(team) + "</div>";
   }
   else if (team.length() > 0)
   {
-    teamPageSection = "<div class='box'><h3>📄 Team Pagina</h3><p>Geen pagina gevonden voor team: " + escapeHtml(team) + "</p></div>";
+    teamPageSection = "<div class='box' id='team-page'><h3>📄 Team Pagina</h3><p>Geen pagina gevonden voor team: " + escapeHtml(team) + "</p></div>";
   }
   else
   {
-    teamPageSection = "<div class='box'><h3>📄 Team Pagina</h3><p>Geen team gekoppeld aan gebruiker.</p></div>";
+    teamPageSection = "<div class='box' id='team-page'><h3>📄 Team Pagina</h3><p>Geen team gekoppeld aan gebruiker.</p></div>";
   }
+
+  Serial.printf("[TEAM-PAGE] user=%s team=%s slug=%s hasPage=%s\n",
+                username.c_str(),
+                team.c_str(),
+                teamSlug.c_str(),
+                hasTeamPage ? "yes" : "no");
     
     // Links
     String links = "<div class='box'><h3>⚙️ Links</h3><ul>";
     links += "<li><a href='/'>Home</a></li>";
-    links += "<li><a href='/register.html'>Register New Player</a></li>";
+    if (teamSlug.length() > 0)
+    {
+      links += "<li><a href='" + String("/") + teamSlug + "'>Team Pagina</a></li>";
+    }
     links += "<li><a href='/debug.html'>Debug Info</a></li>";
     links += "</ul></div>";
+
+    // All team pages overview
+    String allPagesList = "<div class='box'><h3>📚 Alle Team Pagina's</h3><ul>";
+    int allPagesCount = 0;
+    for (int i = 0; i < MAX_TEAM_PAGES; i++)
+    {
+      if (teamNames[i].length() == 0 || teamPages[i].length() == 0)
+      {
+        continue;
+      }
+      String pageTeam = teamNames[i];
+      String pageSlug = slugifyTeam(pageTeam);
+      if (pageSlug.length() == 0)
+      {
+        continue;
+      }
+      String updatedAt = teamPageUpdatedAt[i];
+      allPagesList += "<li><a href='" + String("/") + pageSlug + "'>" + escapeHtml(pageTeam) + "</a>";
+      if (updatedAt.length() > 0)
+      {
+        allPagesList += " <small>(Laatst bijgewerkt: " + escapeHtml(updatedAt) + ")</small>";
+      }
+      allPagesList += "</li>";
+      allPagesCount++;
+    }
+    if (allPagesCount == 0)
+    {
+      allPagesList += "<li>Geen pagina's beschikbaar.</li>";
+    }
+    allPagesList += "</ul></div>";
     
     // Online nodes list
     String nodeList = "<div class='box'><h3>🟢 Online Nodes</h3>";
@@ -382,10 +786,70 @@ String NodeWebServer::makePage(String session)
     page.replace("%USER_COUNT%", String(userCount));
   page.replace("%SYNC_STATUS%", syncStatus);
   page.replace("%TEAM_PAGE%", teamPageSection);
-    page.replace("%ONLINE_NODES%", links + nodeList + userList);
+    page.replace("%ONLINE_NODES%", links + allPagesList + nodeList + userList);
     
     return page;
 }
+
+  String buildTeamPageHtml(const String &teamName, const String &teamSlug, const String &username, bool hasPage, bool usersOk, bool pagesOk, const String &teamHtml)
+  {
+    String page;
+    page += "<!DOCTYPE html><html><head><meta charset='UTF-8'>";
+    page += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    page += "<style>body{font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;}";
+    page += ".card{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}";
+    page += ".meta{color:#666;font-size:0.9em;margin-bottom:10px;}";
+    page += ".link{display:inline-block;margin-bottom:15px;}";
+    page += "pre{background:#f0f0f0;padding:10px;border-radius:6px;overflow:auto;}";
+    page += "</style></head><body>";
+    page += "<a class='link' href='/'>← Back</a>";
+    page += "<div class='card'>";
+    page += "<h2>📄 Team Pagina</h2>";
+    page += "<div class='meta'>Team: <strong>" + escapeHtml(teamName) + "</strong></div>";
+    if (hasPage)
+    {
+      String updatedAt = NodeWebServer::getTeamPageUpdatedAt(teamName);
+      if (updatedAt.length() > 0)
+      {
+        page += "<div class='meta'>Laatst bijgewerkt: <strong>" + escapeHtml(updatedAt) + "</strong></div>";
+      }
+      page += teamHtml;
+    }
+    else
+    {
+      page += "<p>Geen pagina gevonden voor team: " + escapeHtml(teamName) + "</p>";
+    }
+    page += "<h3>Debug</h3>";
+    page += "<pre>";
+    page += "user=" + escapeHtml(username) + "\n";
+    page += "teamSlug=" + escapeHtml(teamSlug) + "\n";
+    page += "hasPage=" + String(hasPage ? "true" : "false") + "\n";
+    page += "usersSynced=" + String(usersOk ? "true" : "false") + "\n";
+    page += "pagesSynced=" + String(pagesOk ? "true" : "false") + "\n";
+    page += "pageLength=" + String(teamHtml.length()) + "\n";
+    page += "</pre>";
+    page += "</div>";
+    page += "<script>";
+    page += "(function(){";
+    page += "const AP_HOST='192.168.3.1';";
+    page += "const AP_URL='http://192.168.3.1/';";
+    page += "const TOKEN_KEY='meshnetSession';";
+    page += "function getCookie(name){const m=document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));return m?decodeURIComponent(m[1]):'';}";
+    page += "function storeToken(t){if(t&&t.length>0){localStorage.setItem(TOKEN_KEY,t);}}";
+    page += "function getStoredToken(){return localStorage.getItem(TOKEN_KEY)||'';}";
+    page += "function clearToken(){localStorage.removeItem(TOKEN_KEY);}";
+    page += "function redirectToAp(t){const target=t?AP_URL+'?token='+encodeURIComponent(t):AP_URL;if(window.location.href!==target){window.location.href=target;}}";
+    page += "function ensureSession(){const url=new URL(window.location.href);if(url.searchParams.get('logout')==='1'){clearToken();url.searchParams.delete('logout');history.replaceState({},'',url.toString());}const cookieToken=getCookie('session');if(cookieToken){storeToken(cookieToken);}else{const cached=getStoredToken();if(cached&&!url.searchParams.get('token')){redirectToAp(cached);}}}";
+    page += "function attemptReconnect(){if(window.location.hostname!==AP_HOST){const cached=getStoredToken();redirectToAp(cached);}}";
+    page += "window.addEventListener('online',attemptReconnect);";
+    page += "document.addEventListener('visibilitychange',function(){if(!document.hidden){attemptReconnect();}});";
+    page += "setInterval(attemptReconnect,15000);";
+    page += "ensureSession();";
+    page += "})();";
+    page += "</script>";
+    page += "</body></html>";
+    return page;
+  }
 
 // ====== Routes ======
 void NodeWebServer::setupRoot()
@@ -400,6 +864,16 @@ void NodeWebServer::setupRoot()
           String syncStatus;
           bool usersOk = NodeWebServer::isUsersSynced();
           bool pagesOk = NodeWebServer::isPagesSynced();
+          bool hasUsers = (User::getUserCount() > 0);
+          const unsigned long nowMs = millis();
+          if ((!usersOk || !pagesOk) && (nowMs - lastSyncRequestMs > 120000)) {
+            if (!usersOk && !LoraNode::isUsersSyncInProgress()) {
+              LoraNode::requestUsers();
+            } else if (!pagesOk) {
+              LoraNode::requestPages();
+            }
+            lastSyncRequestMs = nowMs;
+          }
           if (usersOk && pagesOk)
           {
             syncStatus = "<div style='background:#d4edda;color:#155724;border:1px solid #c3e6cb;padding:10px;border-radius:8px;margin-bottom:20px;'>✅ Users en pagina's gesynchroniseerd</div>";
@@ -410,8 +884,9 @@ void NodeWebServer::setupRoot()
             syncStatus += "⚠️ Sync status: ";
             if (!usersOk) syncStatus += "users ontbreken ";
             if (!pagesOk) syncStatus += "pagina's ontbreken ";
-            syncStatus += "</div>";
+            syncStatus += "<br>⏳ Wacht 2 minuten en probeer opnieuw.</div>";
           }
+          String loginDisabled = (usersOk && hasUsers) ? "" : " disabled";
             String welcomePage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -466,6 +941,12 @@ void NodeWebServer::setupRoot()
       transform: translateY(-2px);
       box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
     }
+    .button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
     .button-register {
       background: #764ba2;
       color: white;
@@ -485,27 +966,106 @@ void NodeWebServer::setupRoot()
 </head>
 <body>
   <div class="container">
-    <h1>🎮 GhostNet</h1>
+    <h1>🎮 MeshNet</h1>
     <p class="subtitle">Welcome to the Gaming Network</p>
-    <p style="margin-bottom: 30px; color: #555;">Please login or register to continue</p>
+    <p style="margin-bottom: 30px; color: #555;">Please login to continue</p>
     %SYNC_STATUS%
-    <a href='/login.html' class='button button-login'>Login</a>
-    <a href='/register.html' class='button button-register'>Register</a>
+    <button class='button button-login' %LOGIN_DISABLED% onclick="if (!this.disabled) { window.location.href='/login.html'; }">Login</button>
     <div class="info">
-      <p>WiFi Network: ghostnet V0.7.4</p>
+      <p>WiFi Network: %SSID%</p>
+      <p>MAC: %MAC%</p>
       <p>Gateway: 192.168.3.1</p>
     </div>
   </div>
+
+  <script>
+    (function () {
+      const AP_HOST = "192.168.3.1";
+      const AP_URL = "http://192.168.3.1/";
+      const TOKEN_KEY = "meshnetSession";
+
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function storeToken(token) {
+        if (token && token.length > 0) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+      }
+
+      function getStoredToken() {
+        return localStorage.getItem(TOKEN_KEY) || "";
+      }
+
+      function clearToken() {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+
+      function redirectToAp(token) {
+        const target = token ? (AP_URL + "?token=" + encodeURIComponent(token)) : AP_URL;
+        if (window.location.href !== target) {
+          window.location.href = target;
+        }
+      }
+
+      function ensureSession() {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('logout') === '1') {
+          clearToken();
+          url.searchParams.delete('logout');
+          history.replaceState({}, '', url.toString());
+        }
+
+        const cookieToken = getCookie('session');
+        if (cookieToken) {
+          storeToken(cookieToken);
+        } else {
+          const cached = getStoredToken();
+          if (cached && !url.searchParams.get('token')) {
+            redirectToAp(cached);
+          }
+        }
+      }
+
+      function attemptReconnect() {
+        if (window.location.hostname !== AP_HOST) {
+          const cached = getStoredToken();
+          redirectToAp(cached);
+        }
+      }
+
+      window.addEventListener('online', attemptReconnect);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+          attemptReconnect();
+        }
+      });
+      setInterval(attemptReconnect, 15000);
+      ensureSession();
+    })();
+  </script>
 </body>
 </html>
 )rawliteral";
-      welcomePage.replace("%SYNC_STATUS%", syncStatus);
-            request->send(200, "text/html; charset=UTF-8", welcomePage);
+              welcomePage.replace("%SYNC_STATUS%", syncStatus);
+              welcomePage.replace("%SSID%", AP_SSID);
+              welcomePage.replace("%MAC%", WiFi.softAPmacAddress());
+              welcomePage.replace("%LOGIN_DISABLED%", loginDisabled);
+      AsyncWebServerResponse *response = request->beginResponse(200, "text/html; charset=UTF-8", welcomePage);
+      response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      response->addHeader("Pragma", "no-cache");
+      response->addHeader("Expires", "0");
+      request->send(response);
         } else {
             Serial.println("[INFO] Session token: " + session);
             String page = makePage(session);
             AsyncWebServerResponse *response = request->beginResponse(200, "text/html; charset=UTF-8", page);
             response->addHeader("Set-Cookie", "session=" + session + "; Path=/; Max-Age=86400");
+      response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      response->addHeader("Pragma", "no-cache");
+      response->addHeader("Expires", "0");
             request->send(response);
         }
     };
@@ -532,6 +1092,56 @@ void NodeWebServer::setupCaptivePortal()
                   { request->send(204); });
     httpServer.onNotFound([](AsyncWebServerRequest *request)
                           {
+    String path = request->url();
+    String slug = path.startsWith("/") ? path.substring(1) : path;
+    bool looksLikeSlug = slug.length() > 0 && slug.indexOf('/') == -1 && slug.indexOf('.') == -1;
+
+    if (looksLikeSlug)
+    {
+      String session = getSessionToken(request);
+      if (session.length() > 0)
+      {
+        String username = User::getNameBySession(session);
+        String userTeam = User::getUserTeamBySession(session);
+        String userTeamSlug = slugifyTeam(userTeam);
+        String resolvedTeam = "";
+
+        if (slug == userTeamSlug)
+        {
+          resolvedTeam = userTeam;
+        }
+        else
+        {
+                resolvedTeam = NodeWebServer::findTeamNameBySlug(slug);
+        }
+
+        bool hasPage = resolvedTeam.length() > 0 && NodeWebServer::hasTeamPage(resolvedTeam);
+        Serial.printf("[TEAM-PAGE] path=%s slug=%s user=%s team=%s resolved=%s hasPage=%s\n",
+                path.c_str(),
+                slug.c_str(),
+                username.c_str(),
+                userTeam.c_str(),
+                resolvedTeam.c_str(),
+                hasPage ? "yes" : "no");
+
+        if (resolvedTeam.length() > 0)
+        {
+          String teamHtml = NodeWebServer::getTeamPage(resolvedTeam);
+          String page = buildTeamPageHtml(
+            resolvedTeam,
+            slug,
+            username,
+            hasPage,
+            NodeWebServer::isUsersSynced(),
+            NodeWebServer::isPagesSynced(),
+            teamHtml
+          );
+          request->send(200, "text/html; charset=UTF-8", page);
+          return;
+        }
+      }
+    }
+
     // Redirect onbekende URLs naar home (Captive Portal gedrag)
     AsyncWebServerResponse *response = request->beginResponse(302);
     response->addHeader("Location", "/");
@@ -577,6 +1187,33 @@ void NodeWebServer::setupLogin()
 {
     httpServer.on("/login.html", HTTP_GET, [](AsyncWebServerRequest *request)
                   { 
+        bool usersOk = NodeWebServer::isUsersSynced();
+        bool pagesOk = NodeWebServer::isPagesSynced();
+        bool hasUsers = (User::getUserCount() > 0);
+        const unsigned long nowMs = millis();
+        if ((!usersOk || !pagesOk) && (nowMs - lastSyncRequestMs > 120000)) {
+          if (!usersOk && !LoraNode::isUsersSyncInProgress()) {
+            LoraNode::requestUsers();
+          } else if (!pagesOk) {
+            LoraNode::requestPages();
+          }
+          lastSyncRequestMs = nowMs;
+        }
+        String syncStatus;
+        if (usersOk && pagesOk)
+        {
+          syncStatus = "<div style='background:#d4edda;color:#155724;border:1px solid #c3e6cb;padding:10px;border-radius:8px;margin-bottom:20px;border-radius:8px;'>✅ Users en pagina's gesynchroniseerd</div>";
+        }
+        else
+        {
+          syncStatus = "<div style='background:#fff3cd;color:#856404;border:1px solid #ffeeba;padding:10px;border-radius:8px;margin-bottom:20px;'>";
+          syncStatus += "⚠️ Sync status: ";
+          if (!usersOk) syncStatus += "users ontbreken ";
+          if (!pagesOk) syncStatus += "pagina's ontbreken ";
+          syncStatus += "<br>⏳ Wacht 2 minuten en probeer opnieuw.</div>";
+        }
+        String loginDisabled = (usersOk && hasUsers) ? "" : " disabled";
+        String inputDisabled = (usersOk && hasUsers) ? "" : " disabled";
         String loginPage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -673,29 +1310,126 @@ void NodeWebServer::setupLogin()
   <div class="container">
     <h1>🎮</h1>
     <p class="subtitle">Login to MeshNet</p>
+    %SYNC_STATUS%
     <form method='POST' action='/login'>
       <div class="form-group">
         <label for="user">Username</label>
-        <input type='text' name='user' id='user' placeholder='test or sander' required autofocus>
+        <input type='text' name='user' id='user' placeholder='test or sander' required autofocus %INPUT_DISABLED%>
       </div>
       <div class="form-group">
         <label for="pass">Password</label>
-        <input type='password' name='pass' id='pass' placeholder='Enter password' required>
+        <input type='password' name='pass' id='pass' placeholder='Enter password' required %INPUT_DISABLED%>
       </div>
-      <input type='submit' value='Login'>
+      <input type='submit' value='Login'%LOGIN_DISABLED%>
     </form>
     <div class="back-link">
       <a href='/'>← Back</a>
     </div>
   </div>
+
+  <script>
+    (function () {
+      const AP_HOST = "192.168.3.1";
+      const AP_URL = "http://192.168.3.1/";
+      const TOKEN_KEY = "meshnetSession";
+
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function storeToken(token) {
+        if (token && token.length > 0) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+      }
+
+      function getStoredToken() {
+        return localStorage.getItem(TOKEN_KEY) || "";
+      }
+
+      function clearToken() {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+
+      function redirectToAp(token) {
+        const target = token ? (AP_URL + "?token=" + encodeURIComponent(token)) : AP_URL;
+        if (window.location.href !== target) {
+          window.location.href = target;
+        }
+      }
+
+      function ensureSession() {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('logout') === '1') {
+          clearToken();
+          url.searchParams.delete('logout');
+          history.replaceState({}, '', url.toString());
+        }
+
+        const cookieToken = getCookie('session');
+        if (cookieToken) {
+          storeToken(cookieToken);
+        } else {
+          const cached = getStoredToken();
+          if (cached && !url.searchParams.get('token')) {
+            redirectToAp(cached);
+          }
+        }
+      }
+
+      function attemptReconnect() {
+        if (window.location.hostname !== AP_HOST) {
+          const cached = getStoredToken();
+          redirectToAp(cached);
+        }
+      }
+
+      window.addEventListener('online', attemptReconnect);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+          attemptReconnect();
+        }
+      });
+      setInterval(attemptReconnect, 15000);
+      ensureSession();
+    })();
+  </script>
 </body>
 </html>
 )rawliteral";
-        request->send(200, "text/html", loginPage);
+        loginPage.replace("%SYNC_STATUS%", syncStatus);
+        loginPage.replace("%LOGIN_DISABLED%", loginDisabled);
+        loginPage.replace("%INPUT_DISABLED%", inputDisabled);
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html; charset=UTF-8", loginPage);
+  response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  response->addHeader("Pragma", "no-cache");
+  response->addHeader("Expires", "0");
+  request->send(response);
                   });
 
     httpServer.on("/login", HTTP_POST, [](AsyncWebServerRequest *request)
                   {
+        bool usersOk = NodeWebServer::isUsersSynced();
+        bool pagesOk = NodeWebServer::isPagesSynced();
+        bool hasUsers = (User::getUserCount() > 0);
+        const unsigned long nowMs = millis();
+        if ((!usersOk || !pagesOk) && (nowMs - lastSyncRequestMs > 120000)) {
+          if (!usersOk && !LoraNode::isUsersSyncInProgress()) {
+            LoraNode::requestUsers();
+          } else if (!pagesOk) {
+            LoraNode::requestPages();
+          }
+          lastSyncRequestMs = nowMs;
+        }
+        if (!usersOk || !hasUsers)
+        {
+            String msg = "<h3>⏳ Sync bezig</h3>";
+          msg += "<p>Users zijn nog niet geladen. Probeer het opnieuw zodra de sync klaar is.</p>";
+            msg += "<p><a href='/'>Terug</a></p>";
+            request->send(503, "text/html", msg);
+            return;
+        }
         String user, pass;
         if (request->hasArg("user")) user = request->arg("user");
         if (request->hasArg("pass")) pass = request->arg("pass");
@@ -869,6 +1603,75 @@ void NodeWebServer::setupRegister()
       <a href='/'>← Back</a>
     </div>
   </div>
+
+  <script>
+    (function () {
+      const AP_HOST = "192.168.3.1";
+      const AP_URL = "http://192.168.3.1/";
+      const TOKEN_KEY = "meshnetSession";
+
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function storeToken(token) {
+        if (token && token.length > 0) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+      }
+
+      function getStoredToken() {
+        return localStorage.getItem(TOKEN_KEY) || "";
+      }
+
+      function clearToken() {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+
+      function redirectToAp(token) {
+        const target = token ? (AP_URL + "?token=" + encodeURIComponent(token)) : AP_URL;
+        if (window.location.href !== target) {
+          window.location.href = target;
+        }
+      }
+
+      function ensureSession() {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('logout') === '1') {
+          clearToken();
+          url.searchParams.delete('logout');
+          history.replaceState({}, '', url.toString());
+        }
+
+        const cookieToken = getCookie('session');
+        if (cookieToken) {
+          storeToken(cookieToken);
+        } else {
+          const cached = getStoredToken();
+          if (cached && !url.searchParams.get('token')) {
+            redirectToAp(cached);
+          }
+        }
+      }
+
+      function attemptReconnect() {
+        if (window.location.hostname !== AP_HOST) {
+          const cached = getStoredToken();
+          redirectToAp(cached);
+        }
+      }
+
+      window.addEventListener('online', attemptReconnect);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+          attemptReconnect();
+        }
+      });
+      setInterval(attemptReconnect, 15000);
+      ensureSession();
+    })();
+  </script>
 </body>
 </html>
 )rawliteral";
@@ -899,7 +1702,7 @@ void NodeWebServer::setupLogout()
                   {
         AsyncWebServerResponse *response = request->beginResponse(303);
         response->addHeader("Set-Cookie", "session=; Max-Age=0");
-        response->addHeader("Location", "/");
+  response->addHeader("Location", "/?logout=1");
         request->send(response); });
 }
 
@@ -910,6 +1713,39 @@ void NodeWebServer::setupDebug()
         String page = "<h2>Debug info</h2>";
         page += "<p>Aantal berichten: " + String(MAX_MSGS) + "</p>";
         request->send(200, "text/html", page); });
+
+  httpServer.on("/sync/refresh", HTTP_GET, [](AsyncWebServerRequest *request)
+          {
+    String session = getSessionToken(request);
+    if (session == "")
+    {
+      request->send(403, "text/plain", "Ongeldig of ontbrekend token.");
+      return;
+    }
+
+    bool hard = request->hasArg("hard") && request->arg("hard") == "1";
+    if (hard)
+    {
+      Serial.println("[SYNC] Hard refresh requested - clearing users/pages");
+      User::clearUsers();
+      User::saveUsersNVS();
+      clearPages(true);
+      LoraNode::setUsersSynced(false);
+      NodeWebServer::setUsersSynced(false);
+      LoraNode::setPagesSynced(false);
+      NodeWebServer::setPagesSynced(false);
+    }
+    else
+    {
+      Serial.println("[SYNC] Refresh requested");
+      LoraNode::setPagesSynced(false);
+      NodeWebServer::setPagesSynced(false);
+    }
+
+    LoraNode::requestUsers();
+
+
+    request->send(200, "text/plain", hard ? "Hard refresh gestart" : "Refresh gestart"); });
 }
 
 void NodeWebServer::setupMessages()
@@ -978,6 +1814,9 @@ void NodeWebServer::setupMessages()
 void NodeWebServer::webserverSetup()
 {
     Serial.println("[DEBUG] Starting webserver setup...");
+
+  loadPagesNVS();
+  Serial.println("[DEBUG] loadPagesNVS done");
     
     WiFi.mode(WIFI_AP);
     Serial.println("[DEBUG] WiFi mode set to AP");
@@ -996,9 +1835,6 @@ void NodeWebServer::webserverSetup()
     
     setupLogin();
     Serial.println("[DEBUG] setupLogin done");
-    
-    setupRegister();
-    Serial.println("[DEBUG] setupRegister done");
     
     setupLogout();
     Serial.println("[DEBUG] setupLogout done");

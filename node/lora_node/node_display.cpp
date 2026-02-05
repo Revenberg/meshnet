@@ -14,8 +14,11 @@ unsigned long lastFrameSwitch = 0;
 const unsigned long frameSwitchInterval = 30000; // 30 seconden
 
 void frame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-    display->setFont(ArialMT_Plain_16);
-    display->drawString(x, y, WiFi.softAPSSID());
+    display->setFont(ArialMT_Plain_10);
+    String mac = WiFi.softAPmacAddress();
+    String nodeId = LoraNode::getNodeName();
+    display->drawString(x, y, "MAC: " + mac);
+    display->drawString(x, y + 12, "ID: " + nodeId);
 }
 
 void frame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
