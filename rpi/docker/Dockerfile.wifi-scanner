@@ -8,7 +8,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY ../wifi-scanner/scan_wifi.py /app/scan_wifi.py
+COPY scan_wifi.py /app/scan_wifi.py
 
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "/app/scan_wifi.py"]
