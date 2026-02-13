@@ -10,7 +10,10 @@
 
 ## Takenlijst (kort en uitvoerbaar)
 1. **Push local software naar GIT**
+  - Maak commit-bericht (samenvatting van wijzigingen).
+  - Commit lokaal en push naar remote.
 2. **PULL laatste software versie op RPI**
+  - SSH naar RPI en pull laatste wijzigingen.
 3. **Versie bump** (minor) in alle relevante firmware/config-bestanden.
 4. **Deploy backend (RPI)**: actuele Docker containers via SSH.
 5. **Deploy Heltec devices**:
