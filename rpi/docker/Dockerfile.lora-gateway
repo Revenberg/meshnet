@@ -9,7 +9,10 @@ RUN apk add --no-cache eudev
 COPY package.json ./
 
 # Install dependencies
-RUN npm install --production
+RUN npm config delete proxy || true \
+	&& npm config delete https-proxy || true \
+	&& npm config set registry https://registry.npmjs.org/ \
+	&& npm install --production
 
 # Copy application code
 COPY index.js ./

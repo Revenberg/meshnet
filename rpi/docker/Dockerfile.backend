@@ -7,7 +7,10 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json ./
-RUN npm install --production
+RUN npm config delete proxy || true \
+	&& npm config delete https-proxy || true \
+	&& npm config set registry https://registry.npmjs.org/ \
+	&& npm install --production
 
 # Copy actual application code
 COPY src/ ./src/
