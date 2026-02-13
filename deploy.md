@@ -111,10 +111,6 @@ Voer éénmalig uit wanneer de API tests 404 geven op MeshNode-1/2/3.
 Zie [TEST_PLAYBOOK.md](TEST_PLAYBOOK.md) voor zelf-uitvoerbare stappen, verwachte uitkomsten en herstelacties.
 
 ## Extra functionaliteiten Todo's
-- op de RPI extra WIFI scanner docker
-  - die een alle wifi net werken scanned of de heltec devices hun ap uitzenden
-  - connect naar alle AP's, aanlogged en de team pagina controleerd
-  - vereist NetworkManager op de RPI voor connect checks (anders alleen scan)
 - Opschonen
   - fase 1 markeer files die overbodig zijn (zodat deze niet gebruikt meer kunnen worden)
   - fase 2 test en valideer of files overbodig zijn
