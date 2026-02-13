@@ -58,6 +58,12 @@ def main():
     parser.add_argument("--timeout", type=int, default=1, help="Serial timeout")
     parser.add_argument("--log-file", default=None, help="Optional log file path")
     parser.add_argument("--expected-version", default=None, help="Expected firmware version string")
+    parser.add_argument(
+        "--max-seconds",
+        type=int,
+        default=120,
+        help="Maximum runtime in seconds before stopping (default: 120)",
+    )
     args = parser.parse_args()
 
     ports = [p.device for p in list_ports.comports()]
@@ -84,7 +90,12 @@ def main():
             threads.append(t)
 
         print("\n[SERIAL] Press CTRL+C to exit\n")
-        while True:
+        start_time = time.monotonic()
+        while not stop_event.is_set():
+            if args.max_seconds > 0 and (time.monotonic() - start_time) >= args.max_seconds:
+                print(f"\n[SERIAL] Max runtime reached ({args.max_seconds}s). Stopping...")
+                stop_event.set()
+                break
             time.sleep(0.5)
     except KeyboardInterrupt:
         print("\n[SERIAL] Exiting...")

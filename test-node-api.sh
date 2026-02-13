@@ -97,6 +97,20 @@ post_json "$API_CORE/pages/ensure-defaults" "{}" || true
 echo "  ✓ Default pages ensured"
 echo ""
 
+echo "📊 Test: Nodes Count"
+NODES_JSON=$(get_json "$API_CORE/nodes")
+nodes_count=$(echo "$NODES_JSON" | grep -o '"nodeId"' | wc -l | tr -d ' ')
+test_count=$((test_count + 1))
+echo -n "Test $test_count: Nodes count > 0 ... "
+if [ -n "$nodes_count" ] && [ "$nodes_count" -gt 0 ]; then
+  echo -e "${GREEN}✓ PASS${NC} (count=$nodes_count)"
+  pass_count=$((pass_count + 1))
+else
+  echo -e "${RED}✗ FAIL${NC} (count=${nodes_count:-0})"
+  fail_count=$((fail_count + 1))
+fi
+echo ""
+
 echo "📋 Test: Get Pages for Node 1"
 run_test "List pages for MeshNode-1" \
   "$API_BASE/node/$NODE_1/pages" \

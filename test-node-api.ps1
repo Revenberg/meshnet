@@ -191,6 +191,32 @@ try {
 
 Write-Host ""
 
+# Test: Nodes count > 0
+Write-Host "Test: Nodes Count" -ForegroundColor Cyan
+Write-Host ""
+
+$test_count += 1
+Write-Host -NoNewline "Test $test_count: Nodes count > 0 ... "
+try {
+    $nodesList = Get-ApiJson "$API_CORE/nodes"
+    $nodesCount = if ($nodesList) { $nodesList.Count } else { 0 }
+    if ($nodesCount -gt 0) {
+        Write-Host "PASS" -ForegroundColor Green -NoNewline
+        Write-Host " (count=$nodesCount)"
+        $pass_count += 1
+    } else {
+        Write-Host "FAIL" -ForegroundColor Red -NoNewline
+        Write-Host " (count=$nodesCount)"
+        $fail_count += 1
+    }
+} catch {
+    Write-Host "FAIL" -ForegroundColor Red -NoNewline
+    Write-Host " (Error: $($_.Exception.Message))"
+    $fail_count += 1
+}
+
+Write-Host ""
+
 # Test: List pages for nodes
 Write-Host "Test: Get Pages for Nodes" -ForegroundColor Cyan
 Write-Host ""
