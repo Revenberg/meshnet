@@ -13,7 +13,9 @@
 # Access via: http://meshnet.local or https://meshnet.local
 meshnet.local,
 *.meshnet.local,
-localhost:80 {
+localhost:80,
+192.168.1.3:80,
+:80 {
   # Main dashboard
   route /api/* {
     reverse_proxy 127.0.0.1:3001
