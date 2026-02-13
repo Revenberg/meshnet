@@ -1,5 +1,36 @@
 # MeshNet V1.0.1 - Deployment Status
 
+## ✅ Update Feb 13, 2026 (MeshNet V4.0.0)
+
+**Firmware Version:** MeshNet V4.0.0  
+**Build Date:** Feb 13, 2026  
+**Build Path:** `C:\Users\reven\Documents\Arduino\MeshNet\node\lora_node\build\`
+
+### Flashed Devices (V4.0.0)
+| Port | Device | Status |
+|------|--------|--------|
+| COM5 | Heltec WiFi LoRa 32 V3 (MAC: 9c:13:9e:9f:bd:ac) | ✅ Flashed OK |
+| COM6 | Heltec WiFi LoRa 32 V3 (MAC: 9c:13:9e:ed:11:94) | ✅ Flashed OK |
+
+### Startup Verification (Serial)
+- **COM5**: Version 4.0.0 detected, AP `MeshNet-9E139E9FBDAC_V4.0.0`
+- **COM6**: Version 4.0.0 detected, AP `MeshNet-9E139EED1194_V4.0.0`
+
+### RPI Deployment (No sudo)
+```
+ssh copilot@ghostnet "cd /home/copilot/meshnet; docker compose -f rpi/docker/docker-compose.yml --project-directory rpi/docker up -d"
+```
+
+### RPI USB Heltec Flash (V4.0.0)
+```
+ssh copilot@ghostnet "python3 -m esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 /home/copilot/meshnet/rpi/lora_node_v4.0.0.merged.bin"
+```
+
+### Test Results
+- **API test suite:** ✅ 13/13 passed (includes nodes count > 0)
+- **Sync scope:** ✅ pages per real node = 13
+
+
 ## ✅ Update Feb 7, 2026 (MeshNet V1.7.1)
 
 **Firmware Version:** MeshNet V1.7.1  
