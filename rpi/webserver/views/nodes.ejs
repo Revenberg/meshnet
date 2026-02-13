@@ -57,6 +57,16 @@
     const diffSeconds = (currentTime - lastSeenTime) / 1000;
     return diffSeconds < 60;
   }
+
+  function getLoadedUsersTotal(list) {
+    if (!Array.isArray(list)) return 0;
+    return list.reduce((sum, node) => sum + (node.loadedUsersCount ?? 0), 0);
+  }
+
+  function getLoadedPagesTotal(list) {
+    if (!Array.isArray(list)) return 0;
+    return list.reduce((sum, node) => sum + (node.loadedPagesCount ?? 0), 0);
+  }
 %>
 
 <div class="section">
@@ -140,6 +150,18 @@
       <div class="stat-content">
         <h3><%= nodes ? nodes.filter(n => !isNodeOnline(n)).length : 0 %></h3>
         <p>Offline</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-content">
+        <h3><%= getLoadedUsersTotal(nodes) %></h3>
+        <p>Users Loaded</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-content">
+        <h3><%= getLoadedPagesTotal(nodes) %></h3>
+        <p>Pages Loaded</p>
       </div>
     </div>
   </div>
