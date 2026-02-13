@@ -2,6 +2,14 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Ensure build does not inherit proxy settings
+ENV http_proxy=
+ENV https_proxy=
+ENV HTTP_PROXY=
+ENV HTTPS_PROXY=
+ENV NO_PROXY=
+ENV no_proxy=
+
 # Install system deps for serial port enumeration
 RUN apk add --no-cache eudev
 
