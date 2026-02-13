@@ -102,8 +102,10 @@ def main():
         stop_event.set()
         time.sleep(0.2)
     finally:
+        stop_event.set()
         if log_handle:
             log_handle.close()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

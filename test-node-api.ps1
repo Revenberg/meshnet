@@ -196,7 +196,7 @@ Write-Host "Test: Nodes Count" -ForegroundColor Cyan
 Write-Host ""
 
 $test_count += 1
-Write-Host -NoNewline "Test $test_count: Nodes count > 0 ... "
+Write-Host -NoNewline ("Test $($test_count): Nodes count > 0 ... ")
 try {
     $nodesList = Get-ApiJson "$API_CORE/nodes"
     $nodesCount = if ($nodesList) { $nodesList.Count } else { 0 }

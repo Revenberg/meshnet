@@ -14,7 +14,7 @@ def format_line(port, line):
     return f"[{timestamp}] [{port}] {line}"
 
 
-def monitor_serial(port, baudrate=115200, timeout=1, log_file=None):
+def monitor_serial(port, baudrate=115200, timeout=1, log_file=None, max_seconds=120):
     """Monitor serial port and print output"""
     try:
         ser = serial.Serial(port, baudrate, timeout=timeout)
@@ -24,8 +24,12 @@ def monitor_serial(port, baudrate=115200, timeout=1, log_file=None):
 
         log_handle = open(log_file, "a", encoding="utf-8") if log_file else None
 
+        start_time = time.monotonic()
         try:
             while True:
+                if max_seconds > 0 and (time.monotonic() - start_time) >= max_seconds:
+                    print(f"\n[SERIAL] Max runtime reached ({max_seconds}s). Stopping...")
+                    break
                 if ser.in_waiting:
                     line = ser.readline().decode("utf-8", errors="ignore").strip()
                     if line:
@@ -40,6 +44,7 @@ def monitor_serial(port, baudrate=115200, timeout=1, log_file=None):
         finally:
             if log_handle:
                 log_handle.close()
+        sys.exit(0)
     except serial.SerialException as e:
         print(f"[ERROR] Could not open {port}: {e}")
         sys.exit(1)
@@ -50,6 +55,12 @@ if __name__ == "__main__":
     parser.add_argument("--port", default="COM5", help="Serial port (e.g. COM5)")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate")
     parser.add_argument("--log-file", default=None, help="Optional log file path")
+    parser.add_argument(
+        "--max-seconds",
+        type=int,
+        default=120,
+        help="Maximum runtime in seconds before stopping (default: 120)",
+    )
     args = parser.parse_args()
 
-    monitor_serial(args.port, baudrate=args.baud, log_file=args.log_file)
+    monitor_serial(args.port, baudrate=args.baud, log_file=args.log_file, max_seconds=args.max_seconds)
