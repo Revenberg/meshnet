@@ -65,6 +65,14 @@ Op de RPI zijn **geen sudo** commands nodig voor Docker of het schrijven van de 
 5. Controleer status:
   - `docker ps`
 
+### NetworkManager check (wifi‑scanner connect‑checks)
+1. Controleer of NetworkManager draait:
+  - `systemctl is-active NetworkManager`
+  - `systemctl is-enabled NetworkManager`
+2. Als niet actief of niet enabled, voer uit (met sudo):
+  - `sudo systemctl start NetworkManager`
+  - `sudo systemctl enable NetworkManager`
+
 ### Test-nodes aanmaken (voor test suite)
 Voer éénmalig uit wanneer de API tests 404 geven op MeshNode-1/2/3.
 - `docker exec -i meshnet-mysql mysql -u meshnet -pmeshnet_secure_pwd meshnet <<'SQL'`
