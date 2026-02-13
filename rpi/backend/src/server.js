@@ -457,10 +457,11 @@ async function ensureDefaultPagesForNode(nodeId) {
   const nodeIdBase = stripVersionFromNodeId(nodeId) || nodeId;
   const likePattern = nodeIdBase.replace(/[!%_]/g, '!$&') + '%';
   const macAddress = extractMacFromNodeId(nodeId) || nodeId.substring(0, 17);
+  const functionalName = nodeIdBase.length > 32 ? nodeIdBase.substring(0, 32) : nodeIdBase;
 
   await dbPool.query(
     'INSERT INTO nodes (nodeId, macAddress, functionalName, isActive, lastSeen) VALUES (?, ?, ?, true, NOW()) ON DUPLICATE KEY UPDATE lastSeen = NOW()',
-    [nodeId, macAddress, nodeId]
+    [nodeId, macAddress, functionalName]
   );
 
   const [groups] = await dbPool.query('SELECT id, name FROM `groups`');

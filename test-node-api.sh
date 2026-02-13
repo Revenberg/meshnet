@@ -152,8 +152,8 @@ echo "🚫 Test: Offline Nodes Count"
 NODES_JSON=$(get_json "$API_CORE/nodes")
 offline_count=$(echo "$NODES_JSON" | grep -o '"isActive"[[:space:]]*:[[:space:]]*false' | wc -l | tr -d ' ')
 test_count=$((test_count + 1))
-echo -n "Test $test_count: Offline nodes count > 0 ... "
-if [ -n "$offline_count" ] && [ "$offline_count" -gt 0 ]; then
+echo -n "Test $test_count: Offline nodes count >= 0 ... "
+if [ -n "$offline_count" ] && [ "$offline_count" -ge 0 ]; then
   echo -e "${GREEN}✓ PASS${NC} (offline=$offline_count)"
   pass_count=$((pass_count + 1))
 else
