@@ -21,11 +21,10 @@ if ! command -v docker &> /dev/null; then
     rm get-docker.sh
 fi
 
-# Check Docker Compose
-if ! command -v docker-compose &> /dev/null; then
-    echo "✗ Docker Compose not found. Installing..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+# Check Docker Compose v2
+if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+    echo "✗ Docker Compose v2 not found. Please install Docker Compose v2 (no sudo used by this script)."
+    exit 1
 fi
 
 echo "✓ Prerequisites OK"
@@ -43,7 +42,7 @@ echo ""
 # Copy configuration files
 echo "Setting up configuration..."
 cp rpi/docker/docker-compose.yml ./
-cp rpi/network/setup-ethernet.sh ./network-setup.sh
+cp rpi/network/setup-network.sh ./network-setup.sh
 chmod +x ./network-setup.sh
 echo "✓ Configuration copied"
 echo ""
@@ -51,12 +50,12 @@ echo ""
 # Build and start Docker containers
 echo "Building Docker images..."
 cd rpi/docker
-docker-compose build --no-cache
+docker compose build --no-cache
 echo "✓ Docker images built"
 echo ""
 
 echo "Starting Docker containers..."
-docker-compose up -d
+docker compose up -d
 echo "✓ Containers started"
 echo ""
 
@@ -66,12 +65,12 @@ sleep 10
 
 # Check container health
 echo "Checking container status..."
-docker-compose ps
+docker compose ps
 echo ""
 
 # Initialize database
 echo "Initializing database..."
-docker-compose exec -T mysql mysql -u meshnet -pmeshnet_secure_pwd meshnet < mysql.sql
+docker compose exec -T mysql mysql -u meshnet -pmeshnet_secure_pwd meshnet < mysql.sql
 echo "✓ Database initialized"
 echo ""
 
@@ -86,7 +85,7 @@ echo "  - MySQL:            localhost:3306"
 echo "  - MQTT (optional):  localhost:1883"
 echo ""
 echo "Next steps:"
-echo "1. Configure network: sudo ./network-setup.sh"
+echo "1. Configure network: ./network-setup.sh (requires root, run manually if needed)"
 echo "2. Flash your first node with node/mesh_node.ino"
 echo "3. Access dashboard at http://$(hostname -I | awk '{print $1}')"
 echo ""

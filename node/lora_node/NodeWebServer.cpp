@@ -209,6 +209,7 @@ void NodeWebServer::loadPagesNVS()
 
   pagesSynced = stored > 0;
   Serial.printf("[TEAM-PAGE] Loaded %d pages from NVS\n", stored);
+  Serial.printf("[TEAM-PAGE] Total stored pages: %d\n", stored);
 }
 
 void NodeWebServer::clearPages(bool clearNvs)
@@ -1853,7 +1854,12 @@ void NodeWebServer::webserverSetup()
     
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
     Serial.println("[DEBUG] Soft AP config set");
-    
+
+    String mac = WiFi.softAPmacAddress();
+    mac.replace(":", "");
+    mac.toUpperCase();
+    AP_SSID = String(FIRMWARE_NAME) + "-" + mac + "_V" + String(FIRMWARE_VERSION);
+
     WiFi.softAP(AP_SSID.c_str(), AP_PASS.c_str());
     Serial.println("[DEBUG] Soft AP started: " + AP_SSID);
 

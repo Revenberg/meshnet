@@ -25,7 +25,7 @@ String LoraNode::seenMsgIds[MAX_MSGS];
 int LoraNode::seenMsgIndex = 0;
 static unsigned long pagesSyncRequestMs = 0;
 
-static const int MAX_USER_SYNC_PARTS = 10;
+static const int MAX_USER_SYNC_PARTS = 60;
 static String usersSyncParts[MAX_USER_SYNC_PARTS];
 static int usersSyncExpectedParts = 0;
 static int usersSyncReceivedParts = 0;

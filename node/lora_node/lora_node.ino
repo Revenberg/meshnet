@@ -49,6 +49,10 @@ void setup() {
     bool hasStoredPages = NodeWebServer::getStoredPagesCount() > 0;
     LoraNode::setPagesSynced(hasStoredPages);
     NodeWebServer::setPagesSynced(hasStoredPages);
+
+    Serial.printf("[SETUP] Stored users: %d | Stored pages: %d\n",
+                  User::getUserCount(),
+                  NodeWebServer::getStoredPagesCount());
     
     Serial.println("\n[SETUP] ✓ Setup complete - ready for login");
     Serial.println("========================================\n");
@@ -123,7 +127,8 @@ void loop() {
                 Serial.printf("  [%d] user='%s' team='%s'\n", i, User::getUserName(i).c_str(), User::getUserTeam(i).c_str());
             }
         } else {
-            Serial.println("[SERIAL] Unknown command. Use: REQ;USERS | REQ;PAGES | REFRESH | HARDREFRESH | STATUS | LISTPAGES | LISTUSERS");
+            Serial.println("[SERIAL] Forwarding to LoRa handler: " + cmd);
+            LoraNode::handlePacket(cmd);
         }
     }
 

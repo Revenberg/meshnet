@@ -1,6 +1,9 @@
-﻿#include <Arduino.h>
+// MeshNet Node Firmware
+#include <Arduino.h>
 #include "RPI4.h"
 #include <WiFi.h>
+#include <Preferences.h>
+#include "Config.h"
 #include "LoraNode.h"
 #include "User.h"
 #include "NodeWebServer.h"
@@ -17,6 +20,21 @@ NodeButton button(0); // GPIO0 for button input
 // ============ SETUP ============
 void setup() {
     RPI4::setup();
+    Serial.println("\n[Setup] MeshNet Node Firmware v" + String(MESHNET_VERSION));
+
+    Preferences prefs;
+    prefs.begin("meshnet", false);
+    String lastVersion = prefs.getString("fwVersion", "");
+    if (lastVersion != String(MESHNET_VERSION)) {
+        Serial.println("[Version] New firmware detected: " + String(MESHNET_VERSION) + " (was " + lastVersion + ")");
+        prefs.putString("fwVersion", String(MESHNET_VERSION));
+        prefs.end();
+        Serial.println("[Version] Forcing restart to apply new firmware...");
+        delay(500);
+        ESP.restart();
+    }
+    prefs.end();
+
     User::loadUsersNVS();
     NodeWebServer::webserverSetup();
     LoraNode::setup();

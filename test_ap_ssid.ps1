@@ -1,7 +1,7 @@
-# MeshNet V0.8.1 - AP SSID Verification Test (PowerShell)
+# MeshNet V1.0.1 - AP SSID Verification Test (PowerShell)
 # This script simulates the dynamic AP SSID generation for each node
 
-Write-Host "AP SSID Verification Test v0.8.1" -ForegroundColor Cyan
+Write-Host "AP SSID Verification Test v1.0.1" -ForegroundColor Cyan
 Write-Host "=================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -14,14 +14,14 @@ $macAddresses = @(
 )
 
 $expectedSSIDs = @(
-    "LoRA_A4C138123456_V0.8.1",
-    "LoRA_B2D549234567_V0.8.1",
-    "LoRA_C8E93F345678_V0.8.1",
-    "LoRA_D6F241456789_V0.8.1"
+    "MeshNode-A4C138123456_V1.0.1",
+    "MeshNode-B2D549234567_V1.0.1",
+    "MeshNode-C8E93F345678_V1.0.1",
+    "MeshNode-D6F241456789_V1.0.1"
 )
 
 Write-Host "Configuration:" -ForegroundColor Green
-Write-Host "   Version: V0.8.1"
+Write-Host "   Version: V1.0.1"
 Write-Host "   Board: Heltec WiFi LoRa 32 V3"
 Write-Host "   Expected Nodes: 4"
 Write-Host ""
@@ -36,10 +36,9 @@ for ($i = 0; $i -lt $macAddresses.Count; $i++) {
     $mac = $macAddresses[$i]
     $expected = $expectedSSIDs[$i]
     
-    # Simulate the conversion: Remove colons and use first 12 chars as node name
+    # Simulate the conversion: Remove colons and use full MAC for SSID
     $nodeNameBase = $mac -replace ':', ''
-    $nodeName = "LoRA_" + $nodeNameBase.Substring(0, 12)
-    $generatedSSID = $nodeName + "_V0.8.1"
+    $generatedSSID = "MeshNode-" + $nodeNameBase + "_V1.0.1"
     
     Write-Host "Node $($i+1)/4:"
     Write-Host "  MAC: $mac"

@@ -162,7 +162,7 @@ if ($flashedDevices.Count -eq 0) {
         Write-Host "   ✓ $dev"
     }
     Write-Host ""
-    Write-Host "Next: Connect WiFi SSID 'MeshNet V0.8.1'"
+    Write-Host "Next: Connect WiFi SSID 'MeshNode-<MAC>_V1.0.1'"
     Write-Host "      Login: test / test"
     Write-Host "      Web UI: 192.168.4.1"
 }

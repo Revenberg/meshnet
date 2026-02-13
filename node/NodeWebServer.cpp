@@ -5,6 +5,7 @@
 #include "User.h"
 #include "NodeWebServer.h"
 #include "LoraNode.h"
+#include "Config.h"
 
 // ====== Config ======
 #define DNS_PORT 53
@@ -1199,13 +1200,13 @@ void NodeWebServer::webserverSetup()
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
     Serial.println("[DEBUG] Soft AP config set");
     
-    // Set AP SSID dynamically - each node gets unique name for testing
-    // Format: NodeName_V0.8.1 (e.g., "LoRA_A4C138D12345_V0.8.1")
-    String dynamicSSID = LoraNode::getNodeName();  // Get node name from LoraNode
-    if (dynamicSSID.length() == 0) {
-        dynamicSSID = "Node";  // Fallback if nodeName not yet set
-    }
-    AP_SSID = dynamicSSID + "_V0.8.1";
+    // Set AP SSID dynamically - prefix + MAC + version
+    // Format: MeshNode-AABBCCDDEEFF_V1.0.1
+    String mac = WiFi.softAPmacAddress();
+    mac.replace(":", "");
+    mac.toUpperCase();
+    String baseSsid = String(WIFI_AP_SSID_PREFIX) + mac;
+    AP_SSID = baseSsid + "_V" + String(MESHNET_VERSION);
     
     WiFi.softAP(AP_SSID.c_str(), AP_PASS.c_str());
     Serial.println("[DEBUG] Soft AP started: " + AP_SSID);

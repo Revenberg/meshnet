@@ -1,14 +1,12 @@
-# MeshNet V0.8.1 Firmware Flash Instructions
+# MeshNet V1.0.1 Firmware Flash Instructions
 
 ## Overview
-This document provides step-by-step instructions for flashing the V0.8.1 firmware to all 4 Heltec ESP32 LoRa V3 nodes.
+This document provides step-by-step instructions for flashing the V1.0.1 firmware to all 4 Heltec ESP32 LoRa V3 nodes.
 
-## What's New in V0.8.1
-✅ **Dynamic AP SSID**: Each node broadcasts its own unique AP name (based on MAC address)  
-✅ **Mobile-Friendly Web Interface**: Responsive UI with 44px+ touch targets  
-✅ **Better Typography**: System fonts, improved spacing  
-✅ **Touch-Optimized Forms**: Better login/register pages  
-✅ **Improved Accessibility**: Focus states, autocomplete hints  
+## What's New in V1.0.1
+✅ **Dynamic AP SSID**: Each node broadcasts `MeshNode-<MAC>_V1.0.1`  
+✅ **Version Change Restart**: Auto-restart on new firmware version  
+✅ **Serial Monitoring**: Multi-port monitor script supports version detection  
 
 ## Prerequisites
 - **Arduino CLI** (v1.3.1+): `arduino-cli --version`
@@ -77,9 +75,9 @@ After flashing, the node will:
 
 To verify:
 - **Check Serial Output**: Open Arduino IDE Serial Monitor at 115200 baud
-- **Check WiFi**: Look for new WiFi network named `LoRA_<MAC>_V0.8.1`
+- **Check WiFi**: Look for new WiFi network named `MeshNode-<MAC>_V1.0.1`
 
-Example SSID: `LoRA_A4C13BD12345_V0.8.1`
+Example SSID: `MeshNode-A4C13BD12345_V1.0.1`
 
 ### 4. Repeat for Nodes 2, 3, and 4
 
@@ -87,10 +85,10 @@ Disconnect the first node and repeat steps 2-3 for each remaining node.
 
 **Expected SSIDs after flashing all 4 nodes:**
 ```
-LoRA_<MAC1>_V0.8.1
-LoRA_<MAC2>_V0.8.1
-LoRA_<MAC3>_V0.8.1
-LoRA_<MAC4>_V0.8.1
+MeshNode-<MAC1>_V1.0.1
+MeshNode-<MAC2>_V1.0.1
+MeshNode-<MAC3>_V1.0.1
+MeshNode-<MAC4>_V1.0.1
 ```
 
 ## Testing the Mobile Interface
@@ -99,7 +97,7 @@ After flashing, test the mobile interface:
 
 ### Connect to Node's WiFi:
 1. On your smartphone/tablet
-2. WiFi Settings → Find `LoRA_<MAC>_V0.8.1`
+2. WiFi Settings → Find `MeshNode-<MAC>_V1.0.1`
 3. Connect (no password)
 
 ### Open Web Interface:
@@ -159,7 +157,7 @@ arduino-cli upload -b esp32:esp32:heltec_wifi_lora_32_V3 -p COM3 heltec_esp32_lo
 
 ## Phase C Next Steps
 
-After successfully flashing V0.8.1 to all 4 nodes:
+After successfully flashing V1.0.1 to all 4 nodes:
 
 1. **Test Node Connection Tracking**: Verify logins are recorded in Docker backend
 2. **Implement DNS Routing**: Add DNS forwarding for easier access
@@ -180,7 +178,7 @@ For issues or questions, check:
 
 ---
 
-**Version**: V0.8.1  
+**Version**: V1.0.1  
 **Board**: Heltec WiFi LoRa 32 V3  
 **Created**: January 29, 2026  
 **Status**: Ready for deployment

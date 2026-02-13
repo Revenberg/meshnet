@@ -1,9 +1,9 @@
 #!/bin/bash
-# MeshNet V0.8.1 - AP SSID Verification Test
+# MeshNet V1.0.1 - AP SSID Verification Test
 # This script simulates the dynamic AP SSID generation for each node
 
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║  MeshNet V0.8.1 - AP SSID Verification Test               ║"
+echo "║  MeshNet V1.0.1 - AP SSID Verification Test               ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -16,14 +16,14 @@ declare -a mac_addresses=(
 )
 
 declare -a expected_ssids=(
-    "LoRA_A4C13812345_V0.8.1"
-    "LoRA_B2D54923456_V0.8.1"
-    "LoRA_C8E93F34567_V0.8.1"
-    "LoRA_D6F24145678_V0.8.1"
+    "MeshNode-A4C138123456_V1.0.1"
+    "MeshNode-B2D549234567_V1.0.1"
+    "MeshNode-C8E93F345678_V1.0.1"
+    "MeshNode-D6F241456789_V1.0.1"
 )
 
 echo "📋 Test Configuration:"
-echo "   Version: V0.8.1"
+echo "   Version: V1.0.1"
 echo "   Board: Heltec WiFi LoRa 32 V3"
 echo "   Expected Nodes: 4"
 echo ""
@@ -39,9 +39,9 @@ for i in "${!mac_addresses[@]}"; do
     mac="${mac_addresses[$i]}"
     expected="${expected_ssids[$i]}"
     
-    # Simulate the conversion: Remove colons and use as node name
-    node_name="LoRA_$(echo $mac | sed 's/://g' | head -c 12)"
-    generated_ssid="${node_name}_V0.8.1"
+    # Simulate the conversion: Remove colons and use full MAC for SSID
+    node_name="MeshNode-$(echo $mac | sed 's/://g')"
+    generated_ssid="${node_name}_V1.0.1"
     
     echo "─────────────────────────────────────────────────────────────"
     echo "Node $((i+1))/4:"

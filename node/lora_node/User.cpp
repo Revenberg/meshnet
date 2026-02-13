@@ -51,6 +51,7 @@ void User::loadUsersNVS()
         Serial.printf("  - PasswordHash: '%s' (length=%d)\n", User::users[i].passwordHash.c_str(), User::users[i].passwordHash.length());
     }
     User::prefs.end();
+    Serial.printf("[USER] Total users loaded: %d\n", User::userCount);
     Serial.println("=== [USER] NVS load complete ===\n");
 }
 

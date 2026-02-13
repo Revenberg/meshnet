@@ -1,8 +1,31 @@
-# MeshNet V0.8.1 - Deployment Status
+# MeshNet V1.0.1 - Deployment Status
+
+## ✅ Update Feb 7, 2026 (MeshNet V1.7.1)
+
+**Firmware Version:** MeshNet V1.7.1  
+**Build Date:** Feb 7, 2026  
+**Build Path:** `C:\Users\reven\Documents\Arduino\MeshNet\node\lora_node\build\`
+
+### Flashed Devices (V1.7.1)
+| Port | Device | Status |
+|------|--------|--------|
+| COM5 | Heltec WiFi LoRa 32 V3 (MAC: 9c:13:9e:9f:bd:ac) | ✅ Flashed OK |
+| COM6 | Heltec WiFi LoRa 32 V3 (MAC: 9c:13:9e:ed:11:94) | ✅ Flashed OK |
+
+### Startup Verification (Serial)
+- **COM5**: Version 1.7.1 detected, Users=0, Pages=2, Setup OK
+- **COM6**: Version 1.7.1 detected, Users=1, Pages=2, Setup OK
+
+### RPI Deployment (No sudo)
+```
+ssh copilot@ghostnet "cd /home/copilot/meshnet; docker compose -f rpi/docker/docker-compose.yml up -d"
+```
+
+**RPI Container Status:** All services running (backend, lora-gateway, caddy, mqtt, mysql, web)
 
 ## ✅ Build Status: SUCCESS
 
-**Firmware Version:** MeshNet V0.8.1  
+**Firmware Version:** MeshNet V1.0.1  
 **Build Date:** January 30, 2026  
 **Build Path:** `C:\Users\reven\Documents\Arduino\MeshNet\node\lora_node\build\`
 
@@ -17,11 +40,11 @@ lora_node.ino.bin            1,310 KB  (application firmware)
 ✅ **version.h** - Version macros added:
 ```cpp
 ````markdown
-# MeshNet V1.0.0 - Deployment Status
+# MeshNet V1.0.1 - Deployment Status
 
 ## ✅ Build Status: SUCCESS
 
-**Firmware Version:** MeshNet V1.0.0  
+**Firmware Version:** MeshNet V1.0.1  
 **Build Date:** January 31, 2026  
 **Build Path:** `C:\Users\reven\Documents\Arduino\MeshNet\node\lora_node\build\`
 
@@ -52,6 +75,15 @@ lora_node.ino.bin            1,360 KB  (application firmware)
 
 ## 🚀 Deployment Options
 
+### Option 0: RPI Heltec Flash (SSH, no sudo)
+```
+ssh copilot@ghostnet "python3 -m esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 57600 erase_flash"
+ssh copilot@ghostnet "python3 -m esptool --chip esp32s3 --port /dev/ttyUSB0 --baud 57600 write_flash -z \
+    0x0 /home/copilot/meshnet/firmware/lora_node.ino.bootloader.bin \
+    0x8000 /home/copilot/meshnet/firmware/lora_node.ino.partitions.bin \
+    0x10000 /home/copilot/meshnet/firmware/lora_node.ino.bin"
+```
+
 ### Option 1: Auto Flash (All Connected Devices)
 ```
 cd C:\Users\reven\Documents\Arduino\MeshNet
@@ -61,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File FLASH_ALL_CONNECTED.ps1
 This script will:
 1. ✅ Auto-detect ESP32-S3 devices on all COM ports
 2. ✅ Erase flash memory
-3. ✅ Write MeshNet V1.0.0 firmware
+3. ✅ Write MeshNet V1.0.1 firmware
 4. ✅ Verify boot sequence
 
 ### Option 2: Manual Flash (Single Device)
@@ -87,21 +119,21 @@ python -m esptool --chip esp32s3 --port $port --baud 57600 `
 ### Expected Boot Output
 ```
 ╔════════════════════════════════════════╗
-║  🚀 MeshNet V1.0.0 - STARTING UP      ║
+║  🚀 MeshNet V1.0.1 - STARTING UP      ║
 ╚════════════════════════════════════════╝
 
 [VERSION] Firmware Details:
 [VERSION]   Name: MeshNet
-[VERSION]   Version: 1.0.0
-[VERSION] ✓ MeshNet V1.0.0 confirmed
+[VERSION]   Version: 1.0.1
+[VERSION] ✓ MeshNet V1.0.1 confirmed
 
-[DEBUG] Soft AP started: MeshNet V1.0.0
+[DEBUG] Soft AP started: MeshNode-<MAC>_V1.0.1
 [INFO] Async Webserver gestart
-[LoRa] Init OK, node = LoRA_<MAC>_1.0.0
+[LoRa] Init OK, node = LoRA_<MAC>
 ```
 
 ### WiFi Connection
-- **SSID:** `MeshNet V1.0.0`
+- **SSID:** `MeshNode-<MAC>_V1.0.1`
 - **Password:** (empty/open)
 - **Web UI:** `http://192.168.3.1`
 
@@ -139,6 +171,11 @@ python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.l
 python serial_monitor.py --port COM7 --baud 115200 --log-file logs\serial_COM7.log
 ```
 
+### All Ports (single terminal)
+```
+python serial_monitor_all.py --baud 115200 --expected-version 1.0.1 --log-file logs\serial_all.log
+```
+
 ---
 
 ## 📊 Build Compilation Details
@@ -168,7 +205,7 @@ arduino-cli compile --fqbn esp32:esp32:heltec_wifi_lora_32_V3
 ---
 
 **Last Updated:** Jan 31, 2026  
-**Status:** 1.0.0 flashed to COM5 and COM7  
+**Status:** 1.0.1 flashed to COM5 and COM7  
 **Notes:** Continue with end-to-end tests and log any failures.
 
 ````
