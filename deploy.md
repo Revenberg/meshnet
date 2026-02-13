@@ -110,8 +110,3 @@ Voer éénmalig uit wanneer de API tests 404 geven op MeshNode-1/2/3.
 ### Test Playbook
 Zie [TEST_PLAYBOOK.md](TEST_PLAYBOOK.md) voor zelf-uitvoerbare stappen, verwachte uitkomsten en herstelacties.
 
-## Extra functionaliteiten Todo's
-- Opschonen
-  - fase 1 markeer files die overbodig zijn (zodat deze niet gebruikt meer kunnen worden)
-  - fase 2 test en valideer of files overbodig zijn
-  - fase 3 verwijder files die overbodig zijn
