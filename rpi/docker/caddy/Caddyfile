@@ -9,12 +9,8 @@
   }
 }
 
-# ============ MAIN DASHBOARD ============
-# Access via: http://meshnet.local or https://meshnet.local
-meshnet.local,
-*.meshnet.local,
-localhost:80,
-192.168.1.3:80,
+# ============ MAIN DASHBOARD (HTTP/IP ACCESS) ============
+# Access via: http://192.168.1.3 or http://meshnet.local
 :80 {
   # Main dashboard
   route /api/* {
@@ -27,6 +23,21 @@ localhost:80,
   }
   
   # Default to webserver (dashboard)
+  reverse_proxy 127.0.0.1:8080
+}
+
+# ============ MAIN DASHBOARD (HOSTNAMES) ============
+# Access via: http://meshnet.local
+meshnet.local,
+*.meshnet.local {
+  route /api/* {
+    reverse_proxy 127.0.0.1:3001
+  }
+
+  handle /socket.io/* {
+    reverse_proxy 127.0.0.1:8080
+  }
+
   reverse_proxy 127.0.0.1:8080
 }
 
