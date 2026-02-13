@@ -9,6 +9,8 @@ ENV HTTP_PROXY=
 ENV HTTPS_PROXY=
 ENV NO_PROXY=
 ENV no_proxy=
+ENV npm_config_proxy=
+ENV npm_config_https_proxy=
 
 # Install system deps for serial port enumeration
 # Allow build to continue if Alpine repos are temporarily unavailable

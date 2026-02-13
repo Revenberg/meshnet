@@ -12,6 +12,8 @@ ENV HTTP_PROXY=
 ENV HTTPS_PROXY=
 ENV NO_PROXY=
 ENV no_proxy=
+ENV npm_config_proxy=
+ENV npm_config_https_proxy=
 
 # Install dependencies
 COPY package.json ./
