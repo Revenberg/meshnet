@@ -11,7 +11,8 @@ ENV NO_PROXY=
 ENV no_proxy=
 
 # Install system deps for serial port enumeration
-RUN apk add --no-cache eudev
+# Allow build to continue if Alpine repos are temporarily unavailable
+RUN apk add --no-cache eudev || echo "[WARN] eudev install skipped (repo unavailable)"
 
 # Copy package files
 COPY package.json ./
