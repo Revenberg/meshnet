@@ -3,14 +3,38 @@
   <p>Distributed LoRa mesh network management system</p>
 </div>
 
+<%
+  function isNodeOnline(node) {
+    if (!node) return false;
+    if (node.lastSeen) {
+      const lastSeenTime = new Date(node.lastSeen).getTime();
+      const currentTime = new Date().getTime();
+      const diffSeconds = (currentTime - lastSeenTime) / 1000;
+      return diffSeconds < 60;
+    }
+    return !!node.isActive;
+  }
+
+  const onlineCount = nodes ? nodes.filter(n => isNodeOnline(n)).length : 0;
+  const offlineCount = nodes ? nodes.filter(n => !isNodeOnline(n)).length : 0;
+%>
+
 <div class="dashboard-grid">
   <!-- Stats Cards -->
   <div class="stats-container">
     <div class="stat-card">
       <div class="stat-icon">📡</div>
       <div class="stat-content">
-        <h3><%= nodes ? nodes.length : 0 %></h3>
+        <h3><%= onlineCount %></h3>
         <p>Active Nodes</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">🛑</div>
+      <div class="stat-content">
+        <h3><%= offlineCount %></h3>
+        <p>Nodes Out</p>
       </div>
     </div>
 
@@ -64,7 +88,7 @@
               <td><span class="battery-indicator" data-battery="<%= node.battery || 0 %>"><%= node.battery || '-' %>%</span></td>
               <td><%= node.signalStrength || '-' %> dBm</td>
               <td><time datetime="<%= node.lastSeen %>"><%= node.lastSeen ? new Date(node.lastSeen).toLocaleString() : 'Never' %></time></td>
-              <td><span class="status-badge status-<%= node.isActive ? 'active' : 'inactive' %>"><%= node.isActive ? 'Active' : 'Offline' %></span></td>
+              <td><span class="status-badge status-<%= isNodeOnline(node) ? 'active' : 'inactive' %>"><%= isNodeOnline(node) ? 'Active' : 'Offline' %></span></td>
             </tr>
           <% }); %>
         </tbody>

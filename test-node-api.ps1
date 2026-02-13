@@ -271,6 +271,28 @@ if ($response) {
 }
 Write-Host ""
 
+# Test: Offline nodes count
+Write-Host "Test: Offline Nodes Count" -ForegroundColor Cyan
+Write-Host ""
+$response = Run-Test "List nodes" `
+    "$API_CORE/nodes" 200
+if ($response) {
+    $nodes = $response.Content | ConvertFrom-Json
+    $offlineCount = @($nodes | Where-Object { -not $_.isActive }).Count
+    $script:test_count += 1
+    Write-Host -NoNewline "Test $($script:test_count): Offline nodes count > 0 ... "
+    if ($offlineCount -gt 0) {
+        Write-Host "PASS" -ForegroundColor Green -NoNewline
+        Write-Host " (offline=$offlineCount)"
+        $script:pass_count += 1
+    } else {
+        Write-Host "FAIL" -ForegroundColor Red -NoNewline
+        Write-Host " (offline=$offlineCount)"
+        $script:fail_count += 1
+    }
+}
+Write-Host ""
+
 # Test: Heartbeat
 Write-Host "Test: Heartbeat" -ForegroundColor Cyan
 Write-Host ""

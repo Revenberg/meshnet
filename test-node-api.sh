@@ -134,6 +134,20 @@ run_test "Get MeshNode-3 info" \
   "200"
 echo ""
 
+echo "🚫 Test: Offline Nodes Count"
+NODES_JSON=$(get_json "$API_CORE/nodes")
+offline_count=$(echo "$NODES_JSON" | grep -o '"isActive"[[:space:]]*:[[:space:]]*false' | wc -l | tr -d ' ')
+test_count=$((test_count + 1))
+echo -n "Test $test_count: Offline nodes count > 0 ... "
+if [ -n "$offline_count" ] && [ "$offline_count" -gt 0 ]; then
+  echo -e "${GREEN}✓ PASS${NC} (offline=$offline_count)"
+  pass_count=$((pass_count + 1))
+else
+  echo -e "${RED}✗ FAIL${NC} (offline=${offline_count:-0})"
+  fail_count=$((fail_count + 1))
+fi
+echo ""
+
 echo "💓 Test: Heartbeat"
 run_test "Send heartbeat for MeshNode-1" \
   -X POST "$API_BASE/node/$NODE_1/heartbeat" \
