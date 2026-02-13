@@ -51,6 +51,19 @@
 ### RPI
 Op de RPI zijn **geen sudo** commands nodig voor Docker of het schrijven van de Heltec devices.
 
+### RPI deployment (stappen)
+1. SSH naar RPI en update repo:
+  - `cd ~/meshnet`
+  - `git pull`
+2. Zorg dat `docker-compose.yml` bestaat in `~/meshnet`.
+3. Start containers:
+  - `docker compose up -d`
+4. Bij container‑naam conflict:
+  - `docker rm -f meshnet-mysql meshnet-mqtt meshnet-backend meshnet-lora-gateway meshnet-caddy ghostnet_web`
+  - `docker compose up -d`
+5. Controleer status:
+  - `docker ps`
+
 ## Test taken
 - Alle backend API-endpoints end-to-end testen (HTTP + validatie).
 - Kritieke flows valideren: users, auth, nodes, pages, sync, broadcast, acks/pings/messages.

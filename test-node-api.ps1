@@ -106,7 +106,28 @@ Write-Host ""
 $teamNames = 1..10 | ForEach-Object { "Team $($_.ToString('00'))" }
 $createdTeams = @()
 
+# Preload existing data to avoid duplicate creates
+$existingGroups = @{}
+$existingUsers = @{}
+$existingNodes = @{}
+try {
+    $groupList = Get-ApiJson "$API_CORE/groups"
+    foreach ($g in $groupList) { $existingGroups[$g.name] = $true }
+} catch { }
+try {
+    $userList = Get-ApiJson "$API_CORE/users"
+    foreach ($u in $userList) { $existingUsers[$u.username] = $true }
+} catch { }
+try {
+    $nodeList = Get-ApiJson "$API_CORE/nodes"
+    foreach ($n in $nodeList) { $existingNodes[$n.nodeId] = $true }
+} catch { }
+
 foreach ($team in $teamNames) {
+    if ($existingGroups.ContainsKey($team)) {
+        Write-Host "  SKIP Team exists: $team" -ForegroundColor DarkGray
+        continue
+    }
     try {
         Invoke-ApiPost "$API_CORE/groups" @{ name = $team; description = "Auto test team $team"; permissions = @() } | Out-Null
         $createdTeams += $team
@@ -130,6 +151,10 @@ foreach ($team in $teamNames) {
     $count = Get-Random -Minimum 3 -Maximum 9
     for ($i = 1; $i -le $count; $i++) {
         $username = ("{0}_user{1:00}" -f ($team -replace '\s','').ToLower(), $i)
+        if ($existingUsers.ContainsKey($username)) {
+            Write-Host "  SKIP User exists: $username" -ForegroundColor DarkGray
+            continue
+        }
         try {
             Invoke-ApiPost "$API_CORE/users" @{ username = $username; password = "test123"; groupId = $groupMap[$team] } | Out-Null
             $totalNewUsers++
@@ -144,6 +169,10 @@ foreach ($team in $teamNames) {
 for ($i = 1; $i -le 10; $i++) {
     $nodeId = "VIRTUAL_NODE_{0:00}" -f $i
     $mac = "00:00:00:00:10:{0}" -f ($i.ToString('X2'))
+    if ($existingNodes.ContainsKey($nodeId)) {
+        Write-Host "  SKIP Virtual node exists: $nodeId" -ForegroundColor DarkGray
+        continue
+    }
     try {
         Invoke-ApiPost "$API_CORE/nodes" @{ nodeId = $nodeId; macAddress = $mac; functionalName = "Virtual Node $i"; version = "virtual" } | Out-Null
         Write-Host "  OK Virtual node created: $nodeId" -ForegroundColor Green
