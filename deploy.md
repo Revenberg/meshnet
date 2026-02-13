@@ -34,6 +34,7 @@
   - Op de laptop: autodetect poorten.
 - **Actie (verplicht):** start serial monitor om versies te valideren en log te bewaren. Monitor tot de versies voor de aangesloten serial poorten in de log is verschenen.
   - Indien versie niet correct: **altijd** locate + reflash voor die node uitvoeren en daarna opnieuw valideren tot alle nodes **laatste versie** tonen.
+  - Gebruik `--max-seconds 480` voor 8 minuten maximale monitortijd.
 - **Actie (verplicht):** deployment verslag met nodes (macadres en versie)
 
 ### Voortgang monitoren (PowerShell)

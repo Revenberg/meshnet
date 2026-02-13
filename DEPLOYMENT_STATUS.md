@@ -193,18 +193,18 @@ Use the laptop to read serial logs from the Heltec nodes while the RPI acts as L
 
 ### Single Port (COM5/COM7)
 ```
-python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.log
+python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.log --max-seconds 480
 ```
 
 ### Two Ports (separate terminals)
 ```
-python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.log
-python serial_monitor.py --port COM7 --baud 115200 --log-file logs\serial_COM7.log
+python serial_monitor.py --port COM5 --baud 115200 --log-file logs\serial_COM5.log --max-seconds 480
+python serial_monitor.py --port COM7 --baud 115200 --log-file logs\serial_COM7.log --max-seconds 480
 ```
 
 ### All Ports (single terminal)
 ```
-python serial_monitor_all.py --baud 115200 --expected-version 1.0.1 --log-file logs\serial_all.log
+python serial_monitor_all.py --baud 115200 --expected-version 4.0.0 --log-file logs\serial_all.log --max-seconds 480
 ```
 
 ---
