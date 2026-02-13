@@ -114,3 +114,24 @@ services:
       - /dev/ttyUSB0:/dev/ttyUSB0
     volumes:
       - /dev:/dev  # USB access to Heltec device (read/write)
+
+  # ============ WIFI SCANNER (AP VALIDATION) ============
+  wifi-scanner:
+    build:
+      context: ../wifi-scanner
+      dockerfile: ../docker/Dockerfile.wifi-scanner
+    container_name: meshnet-wifi-scanner
+    network_mode: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - AP_PREFIX=MeshNet-
+      - AP_PASSWORD=
+      - AP_IP=192.168.3.1
+      - CHECK_PATHS=/
+      - SCAN_INTERVAL_S=120
+      - ENABLE_CONNECT=true
+      - WIFI_IFACE=
+      - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+    volumes:
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
