@@ -59,6 +59,8 @@ Op de RPI zijn **geen sudo** commands nodig voor Docker of het schrijven van de 
 2. Zorg dat `docker-compose.yml` bestaat in `~/meshnet`.
 3. Start containers:
   - `docker compose up -d`
+  - **Wifi-scanner (expliciet):**
+    - `docker compose -f ~/meshnet/rpi/docker/docker-compose.yml --project-directory ~/meshnet/rpi/docker up -d wifi-scanner`
 4. Bij container‑naam conflict:
   - `docker rm -f meshnet-mysql meshnet-mqtt meshnet-backend meshnet-lora-gateway meshnet-caddy ghostnet_web`
   - `docker compose up -d`
