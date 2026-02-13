@@ -28,6 +28,7 @@
   - Heltec versie
   - WIFI AP info versie
 - Deploy actuele versies van Docker containers op RPI via SSH.
+- **Deploy‑stap (verplicht):** maak test‑nodes aan in DB als de test suite 404 geeft op MeshNode‑1/2/3 (zie sectie “Test‑nodes aanmaken”).
 - Deploy op alle Heltec devices.
   - Op de RPI: via SSH.
   - Op de laptop: autodetect poorten.
@@ -63,6 +64,16 @@ Op de RPI zijn **geen sudo** commands nodig voor Docker of het schrijven van de 
   - `docker compose up -d`
 5. Controleer status:
   - `docker ps`
+
+### Test-nodes aanmaken (voor test suite)
+Voer éénmalig uit wanneer de API tests 404 geven op MeshNode-1/2/3.
+- `docker exec -i meshnet-mysql mysql -u meshnet -pmeshnet_secure_pwd meshnet <<'SQL'`
+- `INSERT IGNORE INTO nodes (nodeId, macAddress, functionalName, version, isActive, createdAt, updatedAt)`
+- `VALUES`
+- `  ('72d67530-dac6-4666-885c-160cb36579ee','00:00:00:00:aa:01','MeshNode-1','test',true,NOW(),NOW()),`
+- `  ('26b80c3a-a7e2-4634-957a-51f7b777de72','00:00:00:00:aa:02','MeshNode-2','test',true,NOW(),NOW()),`
+- `  ('d1ec1f02-0e0b-4763-94d5-984e93c11bde','00:00:00:00:aa:03','MeshNode-3','test',true,NOW(),NOW());`
+- `SQL`
 
 ## Test taken
 - Alle backend API-endpoints end-to-end testen (HTTP + validatie).
