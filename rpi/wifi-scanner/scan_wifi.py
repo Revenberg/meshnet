@@ -33,11 +33,20 @@ def get_interfaces():
 def nmcli_available():
     return shutil.which("nmcli") is not None
 
+def nmcli_running():
+    if not nmcli_available():
+        return False
+    code, out, err = run_cmd(["nmcli", "-t", "-f", "RUNNING", "general"], timeout=10)
+    if code != 0:
+        log(f"[WARN] nmcli status failed: {err or out}")
+        return False
+    return out.strip().lower() == "running"
+
 def scan_nmcli():
     code, out, err = run_cmd(["nmcli", "-t", "-f", "SSID", "dev", "wifi", "list"], timeout=30)
     if code != 0:
         log(f"[WARN] nmcli scan failed: {err or out}")
-        return []
+        return None
     ssids = []
     for line in out.splitlines():
         ssid = line.strip()
@@ -75,7 +84,7 @@ def get_active_connection(iface):
     return None
 
 def connect_ssid(ssid, iface, password):
-    if not nmcli_available():
+    if not nmcli_running():
         log("[WARN] nmcli not available; cannot connect to APs")
         return False
     cmd = ["nmcli", "--wait", "15", "dev", "wifi", "connect", ssid]
@@ -130,13 +139,15 @@ def main():
             log("[WARN] No WiFi interfaces found")
         ssids = []
         if nmcli_available():
-            ssids = scan_nmcli()
+                ssids = scan_nmcli()
+                if ssids is None and ifaces:
+                    ssids = scan_iw(ifaces[0])
         elif ifaces:
             ssids = scan_iw(ifaces[0])
         targets = sorted({s for s in ssids if s.startswith(ap_prefix)})
         log(f"[SCAN] Found {len(targets)} target APs: {', '.join(targets) if targets else '-'}")
 
-        if enable_connect and targets and ifaces:
+        if enable_connect and targets and ifaces and nmcli_running():
             iface = ifaces[0]
             previous_conn = get_active_connection(iface)
             for ssid in targets:
@@ -147,6 +158,8 @@ def main():
                     time.sleep(2)
             if previous_conn:
                 restore_connection(previous_conn)
+        elif enable_connect and targets and ifaces:
+            log("[WARN] Skipping connect checks: NetworkManager not running")
         time.sleep(scan_interval)
 
 if __name__ == "__main__":
