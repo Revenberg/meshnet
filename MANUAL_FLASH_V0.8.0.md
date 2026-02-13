@@ -1,6 +1,8 @@
 # MeshNet V0.8.1 Flash Instructions - Manual Method
 # Use this if script/terminal issues occur
 
+> **DEPRECATED**: Gebruik [FLASH_ALL_CONNECTED.ps1](FLASH_ALL_CONNECTED.ps1) of [scripts/flash_with_timing.ps1](scripts/flash_with_timing.ps1).
+
 ## Quick Method: Drag & Drop via Arduino IDE
 
 1. Open Arduino IDE

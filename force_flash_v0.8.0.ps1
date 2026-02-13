@@ -1,4 +1,6 @@
 #!/usr/bin/env powershell
+Write-Host "[DEPRECATED] Gebruik FLASH_ALL_CONNECTED.ps1 of scripts/flash_with_timing.ps1" -ForegroundColor Yellow
+exit 1
 # MeshNet V0.8.1 ESP32 Forced Flash
 # Properly erases and flashes with reset
 

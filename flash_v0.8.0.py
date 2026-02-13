@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+raise SystemExit("[DEPRECATED] Gebruik FLASH_ALL_CONNECTED.ps1 of scripts/flash_with_timing.ps1")
 """
 MeshNet V0.8.1 Flash Script with NVRAM Wipe
 Uses esptool to erase flash and properly flash new firmware

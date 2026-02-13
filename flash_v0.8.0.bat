@@ -1,4 +1,6 @@
 @echo off
+echo [DEPRECATED] Gebruik FLASH_ALL_CONNECTED.ps1 of scripts\flash_with_timing.ps1
+exit /b 1
 REM MeshNet V0.8.1 Flash Script - FIXED VERSION
 setlocal enabledelayedexpansion
 

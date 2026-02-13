@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+raise SystemExit("[DEPRECATED] Gebruik FLASH_ALL_CONNECTED.ps1 of scripts/flash_with_timing.ps1")
 import subprocess
 import time
 import sys
