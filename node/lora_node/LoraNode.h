@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <RadioLib.h>
+#include <Preferences.h>
 #include "User.h"
 #include "version.h"
 
@@ -76,6 +77,8 @@ public:
   static void setPagesSynced(bool synced);
   static bool isUsersSyncInProgress();
   static void transmitRaw(const String &packet);
+  static void loadSyncStatus();
+  static void saveSyncStatus();
   static int msgWriteIndex;
   static int onlineCount;
   static bool usersSynced;
@@ -103,4 +106,7 @@ private:
 
   // Settings
   static int beaconInterval;
+  
+  // Persistent storage for sync status
+  static Preferences syncPrefs;
 };

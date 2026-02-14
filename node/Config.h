@@ -74,8 +74,8 @@
 #define DEBUG_TOPICS "LORA|MESH|DISPLAY|AUTH|WEBSERVER"
 
 // ============ VERSION ============
-#define MESHNET_VERSION "2.0.3"
-#define NODE_PROTOCOL_VERSION "2.0.3"
+#define MESHNET_VERSION "2.0.6"
+#define NODE_PROTOCOL_VERSION "2.0.6"
 
 // ============ FEATURE FLAGS ============
 #define FEATURE_ENABLE_MESH_ROUTING 1

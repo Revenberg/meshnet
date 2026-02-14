@@ -23,6 +23,7 @@ bool LoraNode::pagesSynced = false;
 unsigned long LoraNode::lastSyncAttempt = 0;
 String LoraNode::seenMsgIds[MAX_MSGS];
 int LoraNode::seenMsgIndex = 0;
+Preferences LoraNode::syncPrefs;
 static unsigned long pagesSyncRequestMs = 0;
 
 static const int MAX_USER_SYNC_PARTS = 60;
@@ -51,6 +52,27 @@ static bool hasActivePageEntries();
 static void resetPageEntrySlot(int slot);
 
 // =======================
+// Persistent Sync Status
+// =======================
+void LoraNode::loadSyncStatus()
+{
+    syncPrefs.begin("lorasync", true);
+    usersSynced = syncPrefs.getBool("usersSynced", false);
+    pagesSynced = syncPrefs.getBool("pagesSynced", false);
+    syncPrefs.end();
+    Serial.printf("[SYNC] Loaded from NVS: usersSynced=%d, pagesSynced=%d\n", usersSynced, pagesSynced);
+}
+
+void LoraNode::saveSyncStatus()
+{
+    syncPrefs.begin("lorasync", false);
+    syncPrefs.putBool("usersSynced", usersSynced);
+    syncPrefs.putBool("pagesSynced", pagesSynced);
+    syncPrefs.end();
+    Serial.printf("[SYNC] Saved to NVS: usersSynced=%d, pagesSynced=%d\n", usersSynced, pagesSynced);
+}
+
+// =======================
 // Setup
 // =======================
 void LoraNode::setup()
@@ -73,7 +95,18 @@ void LoraNode::setup()
     Serial.println("[LoRa] Init OK, node = " + nodeName);
     addOnlineNode(nodeName, 0, 0);
 
-    requestUsers();
+    // Load persistent sync status from NVS
+    loadSyncStatus();
+    
+    // Only request users if not already synced
+    if (!usersSynced)
+    {
+        requestUsers();
+    }
+    else
+    {
+        Serial.println("[SYNC] Users already synced (from NVS), skipping initial request");
+    }
 }
 
 void LoraNode::requestUsers()
@@ -97,8 +130,19 @@ void LoraNode::requestPages()
 
 bool LoraNode::isUsersSynced() { return usersSynced; }
 bool LoraNode::isPagesSynced() { return pagesSynced; }
-void LoraNode::setUsersSynced(bool synced) { usersSynced = synced; }
-void LoraNode::setPagesSynced(bool synced) { pagesSynced = synced; }
+
+void LoraNode::setUsersSynced(bool synced)
+{
+    usersSynced = synced;
+    saveSyncStatus();
+}
+
+void LoraNode::setPagesSynced(bool synced)
+{
+    pagesSynced = synced;
+    saveSyncStatus();
+}
+
 bool LoraNode::isUsersSyncInProgress() { return usersSyncExpectedParts > 0; }
 
 void LoraNode::transmitRaw(const String &packet)
