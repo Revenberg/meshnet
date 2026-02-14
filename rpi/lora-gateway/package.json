@@ -1,6 +1,6 @@
 {
   "name": "lora-gateway",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LoRa Gateway Bridge - Connects Docker backend to LoRa network via USB",
   "main": "index.js",
   "scripts": {
